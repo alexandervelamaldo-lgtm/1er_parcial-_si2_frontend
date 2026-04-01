@@ -1,0 +1,29 @@
+<div class="shell" *ngIf="isAuthenticated(); else authView">
+  <aside class="sidebar">
+    <div>
+      <span class="brand-tag">Panel del taller</span>
+      <h1>Emergency SI2</h1>
+      <p>Centro de coordinación de incidentes vehiculares.</p>
+      <div class="user-card" *ngIf="profile() as profile">
+        <strong>{{ profile.user.email }}</strong>
+        <span>{{ roleLabel() }}</span>
+      </div>
+    </div>
+
+    <nav>
+      <a *ngFor="let item of visibleNavigation()" [routerLink]="item.path" routerLinkActive="active">
+        {{ item.label }}
+      </a>
+    </nav>
+
+    <button class="logout" type="button" (click)="logout()">Cerrar sesión</button>
+  </aside>
+
+  <main class="content">
+    <router-outlet />
+  </main>
+</div>
+
+<ng-template #authView>
+  <router-outlet />
+</ng-template>
