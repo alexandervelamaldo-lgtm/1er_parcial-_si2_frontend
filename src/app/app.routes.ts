@@ -21,9 +21,9 @@ export const routes: Routes = [
     path: '',
     canActivate: [authGuard],
     children: [
-      { path: 'dashboard', component: DashboardPageComponent, canActivate: [roleGuard(['ADMINISTRADOR', 'OPERADOR', 'TECNICO'])] },
-      { path: 'solicitudes', component: SolicitudesPageComponent, canActivate: [roleGuard(['ADMINISTRADOR', 'OPERADOR', 'TECNICO'])] },
-      { path: 'solicitudes/:id', component: SolicitudDetallePageComponent, canActivate: [roleGuard(['ADMINISTRADOR', 'OPERADOR', 'TECNICO'])] },
+      { path: 'dashboard', component: DashboardPageComponent, canActivate: [roleGuard(['ADMINISTRADOR', 'OPERADOR', 'TECNICO', 'TALLER'])] },
+      { path: 'solicitudes', component: SolicitudesPageComponent, canActivate: [roleGuard(['ADMINISTRADOR', 'OPERADOR', 'TECNICO', 'TALLER'])] },
+      { path: 'solicitudes/:id', component: SolicitudDetallePageComponent, canActivate: [roleGuard(['ADMINISTRADOR', 'OPERADOR', 'TECNICO', 'TALLER'])] },
       { path: 'tecnicos', component: TecnicosPageComponent, canActivate: [roleGuard(['ADMINISTRADOR', 'OPERADOR'])] },
       { path: 'clientes', component: ClientesPageComponent, canActivate: [roleGuard(['ADMINISTRADOR', 'OPERADOR'])] },
       { path: 'historial', component: HistorialPageComponent },

@@ -20,8 +20,8 @@ interface NavigationItem {
 export class App {
   private readonly authService = inject(AuthService);
   private readonly navigationItems: NavigationItem[] = [
-    { label: 'Dashboard', path: '/dashboard', roles: ['ADMINISTRADOR', 'OPERADOR', 'TECNICO'] },
-    { label: 'Solicitudes', path: '/solicitudes', roles: ['ADMINISTRADOR', 'OPERADOR', 'TECNICO'] },
+    { label: 'Dashboard', path: '/dashboard', roles: ['ADMINISTRADOR', 'OPERADOR', 'TECNICO', 'TALLER'] },
+    { label: 'Solicitudes', path: '/solicitudes', roles: ['ADMINISTRADOR', 'OPERADOR', 'TECNICO', 'TALLER'] },
     { label: 'Técnicos', path: '/tecnicos', roles: ['ADMINISTRADOR', 'OPERADOR'] },
     { label: 'Clientes', path: '/clientes', roles: ['ADMINISTRADOR', 'OPERADOR'] },
     { label: 'Historial', path: '/historial' },

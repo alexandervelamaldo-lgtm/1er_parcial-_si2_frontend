@@ -3,7 +3,18 @@ import { HttpClient, HttpHeaders } from '@angular/common/http';
 
 import { environment } from '../../../environments/environment';
 import { AuthService } from './auth.service';
-import { Cliente, CurrentUserProfile, Notificacion, Solicitud, Tecnico } from '../models/api.models';
+import {
+  Cliente,
+  CurrentUserProfile,
+  EstadoSolicitudOption,
+  Notificacion,
+  Solicitud,
+  SolicitudCandidatos,
+  SolicitudDetalle,
+  SolicitudSeguimiento,
+  Taller,
+  Tecnico
+} from '../models/api.models';
 
 
 @Injectable({ providedIn: 'root' })
@@ -34,6 +45,31 @@ export class EmergencyApiService {
     });
   }
 
+  getSolicitudDetalle(solicitudId: number) {
+    return this.http.get<SolicitudDetalle>(`${environment.apiUrl}/solicitudes/${solicitudId}/detalle`, {
+      headers: this.headers
+    });
+  }
+
+  getCandidatosSolicitud(solicitudId: number) {
+    return this.http.get<SolicitudCandidatos>(`${environment.apiUrl}/solicitudes/${solicitudId}/candidatos`, {
+      headers: this.headers
+    });
+  }
+
+  getSeguimientoSolicitud(solicitudId: number) {
+    return this.http.get<SolicitudSeguimiento>(
+      `${environment.apiUrl}/solicitudes/${solicitudId}/seguimiento`,
+      { headers: this.headers }
+    );
+  }
+
+  getEstadosSolicitud() {
+    return this.http.get<EstadoSolicitudOption[]>(`${environment.apiUrl}/solicitudes/estados`, {
+      headers: this.headers
+    });
+  }
+
   actualizarEstado(solicitudId: number, estadoId: number, observacion: string) {
     return this.http.put<Solicitud>(
       `${environment.apiUrl}/solicitudes/${solicitudId}/estado`,
@@ -42,16 +78,67 @@ export class EmergencyApiService {
     );
   }
 
-  asignarTecnico(solicitudId: number, tecnicoId: number) {
+  asignarTecnico(solicitudId: number, tecnicoId?: number | null, tallerId?: number | null) {
     return this.http.put<Solicitud>(
       `${environment.apiUrl}/solicitudes/${solicitudId}/asignar`,
-      { tecnico_id: tecnicoId },
+      { tecnico_id: tecnicoId, taller_id: tallerId ?? null },
+      { headers: this.headers }
+    );
+  }
+
+  responderAsignacion(solicitudId: number, aceptada: boolean, observacion: string) {
+    return this.http.put<Solicitud>(
+      `${environment.apiUrl}/solicitudes/${solicitudId}/responder-asignacion`,
+      { aceptada, observacion },
+      { headers: this.headers }
+    );
+  }
+
+  responderAsignacionTaller(solicitudId: number, aceptada: boolean, observacion: string) {
+    return this.http.put<Solicitud>(
+      `${environment.apiUrl}/solicitudes/${solicitudId}/respuesta-taller`,
+      { aceptada, observacion },
+      { headers: this.headers }
+    );
+  }
+
+  responderPropuestaCliente(solicitudId: number, aprobada: boolean, observacion: string) {
+    return this.http.put<Solicitud>(
+      `${environment.apiUrl}/solicitudes/${solicitudId}/respuesta-cliente`,
+      { aprobada, observacion },
+      { headers: this.headers }
+    );
+  }
+
+  revisarManual(solicitudId: number, confianza: number, prioridad: string, resumenIa: string, motivoPrioridad: string) {
+    return this.http.put<Solicitud>(
+      `${environment.apiUrl}/solicitudes/${solicitudId}/revision-manual`,
+      {
+        confianza,
+        prioridad,
+        resumen_ia: resumenIa,
+        motivo_prioridad: motivoPrioridad
+      },
+      { headers: this.headers }
+    );
+  }
+
+  cancelarSolicitud(solicitudId: number, observacion: string) {
+    return this.http.put<Solicitud>(
+      `${environment.apiUrl}/solicitudes/${solicitudId}/cancelar`,
+      { observacion },
       { headers: this.headers }
     );
   }
 
   getTecnicos() {
     return this.http.get<Tecnico[]>(`${environment.apiUrl}/tecnicos`, {
+      headers: this.headers
+    });
+  }
+
+  getMiTaller() {
+    return this.http.get<Taller>(`${environment.apiUrl}/talleres/mi-taller`, {
       headers: this.headers
     });
   }
@@ -72,6 +159,14 @@ export class EmergencyApiService {
     return this.http.put<Notificacion>(
       `${environment.apiUrl}/notificaciones/${notificacionId}/leida`,
       {},
+      { headers: this.headers }
+    );
+  }
+
+  registrarDeviceToken(token: string, plataforma = 'web') {
+    return this.http.post<void>(
+      `${environment.apiUrl}/notificaciones/device-token`,
+      { token, plataforma },
       { headers: this.headers }
     );
   }
