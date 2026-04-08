@@ -208,6 +208,30 @@ export interface Cliente {
   direccion: string;
   latitud?: number | null;
   longitud?: number | null;
+  user?: UserProfile | null;
+  vehiculos?: Vehiculo[];
+}
+
+export interface Vehiculo {
+  id?: number;
+  cliente_id?: number;
+  marca: string;
+  modelo: string;
+  anio: number;
+  placa: string;
+  color: string;
+  tipo_combustible: string;
+}
+
+export interface ClienteCreatePayload {
+  email: string;
+  password: string;
+  nombre: string;
+  telefono: string;
+  direccion: string;
+  latitud?: number | null;
+  longitud?: number | null;
+  vehiculo: Omit<Vehiculo, 'id' | 'cliente_id'>;
 }
 
 export interface Notificacion {
@@ -217,4 +241,16 @@ export interface Notificacion {
   tipo: string;
   leida: boolean;
   fecha_creacion: string;
+}
+
+export interface TecnicoCreatePayload {
+  email: string;
+  password: string;
+  nombre: string;
+  telefono: string;
+  especialidad: string;
+  taller_id?: number | null;
+  latitud_actual?: number | null;
+  longitud_actual?: number | null;
+  disponibilidad?: boolean;
 }

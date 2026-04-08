@@ -5,6 +5,7 @@ import { environment } from '../../../environments/environment';
 import { AuthService } from './auth.service';
 import {
   Cliente,
+  ClienteCreatePayload,
   CurrentUserProfile,
   EstadoSolicitudOption,
   Notificacion,
@@ -13,7 +14,8 @@ import {
   SolicitudDetalle,
   SolicitudSeguimiento,
   Taller,
-  Tecnico
+  Tecnico,
+  TecnicoCreatePayload
 } from '../models/api.models';
 
 
@@ -137,6 +139,12 @@ export class EmergencyApiService {
     });
   }
 
+  createTecnico(payload: TecnicoCreatePayload) {
+    return this.http.post<Tecnico>(`${environment.apiUrl}/tecnicos`, payload, {
+      headers: this.headers
+    });
+  }
+
   getMiTaller() {
     return this.http.get<Taller>(`${environment.apiUrl}/talleres/mi-taller`, {
       headers: this.headers
@@ -145,6 +153,12 @@ export class EmergencyApiService {
 
   getClientes() {
     return this.http.get<Cliente[]>(`${environment.apiUrl}/clientes`, {
+      headers: this.headers
+    });
+  }
+
+  createCliente(payload: ClienteCreatePayload) {
+    return this.http.post<Cliente>(`${environment.apiUrl}/clientes`, payload, {
       headers: this.headers
     });
   }
