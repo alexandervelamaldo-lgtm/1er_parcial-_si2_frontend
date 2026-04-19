@@ -136,6 +136,21 @@ import { AuthService } from '../core/services/auth.service';
     .btn-secondary:hover { background: #e2e8f0; }
     .btn-danger-light { background: #fff1f2; color: #e11d48; }
     .btn-danger-light:hover { background: #ffe4e6; }
+
+    @media (max-width: 900px) {
+      .management-container { padding: 1rem; }
+      .profile-header { flex-wrap: wrap; padding: 1.25rem; }
+      .status-pill { margin-left: 0; }
+      .profile-grid { grid-template-columns: 1fr; }
+      .profile-footer { flex-direction: column; }
+      .profile-footer button { width: 100%; }
+    }
+
+    @media (max-width: 480px) {
+      .user-avatar { width: 64px; height: 64px; font-size: 1.5rem; }
+      .user-main-info h1 { font-size: 1.4rem; }
+      .id-box { flex-direction: column; align-items: flex-start; gap: 0.35rem; }
+    }
   `
 })
 export class PerfilPageComponent {

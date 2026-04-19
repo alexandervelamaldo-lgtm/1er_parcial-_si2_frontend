@@ -3,6 +3,7 @@
   grid-template-columns: 280px 1fr;
   min-height: 100vh;
   background: #f1f5f9;
+  overflow-x: hidden;
 }
 
 .sidebar {
@@ -12,6 +13,7 @@
   padding: 2rem;
   background: linear-gradient(180deg, #0f172a 0%, #1d4ed8 100%);
   color: #fff;
+  min-width: 0;
 }
 
 .brand-tag {
@@ -49,6 +51,7 @@
 nav {
   display: grid;
   gap: 0.75rem;
+  min-width: 0;
 }
 
 nav a {
@@ -76,10 +79,45 @@ nav a.active {
 
 .content {
   padding: 2rem;
+  min-width: 0;
 }
 
 @media (max-width: 960px) {
   .shell {
     grid-template-columns: 1fr;
+  }
+
+  .sidebar {
+    gap: 1.5rem;
+    padding: 1.25rem;
+  }
+
+  nav {
+    grid-auto-flow: column;
+    grid-auto-columns: max-content;
+    overflow-x: auto;
+    padding-bottom: 0.25rem;
+  }
+
+  nav a {
+    white-space: nowrap;
+  }
+
+  .content {
+    padding: 1rem;
+  }
+}
+
+@media (max-width: 640px) {
+  .sidebar {
+    padding: 1rem;
+  }
+
+  .user-card {
+    padding: 0.85rem;
+  }
+
+  .logout {
+    width: 100%;
   }
 }

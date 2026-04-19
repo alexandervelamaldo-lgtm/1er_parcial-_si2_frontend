@@ -242,6 +242,27 @@ import { Cliente, ClienteCreatePayload } from '../core/models/api.models';
     @keyframes spin { to { transform: rotate(360deg); } }
 
     .empty-row { text-align: center; padding: 3rem !important; color: var(--gray); font-style: italic; }
+
+    /* Responsive */
+    @media (max-width: 1100px) {
+      .page-header { flex-direction: column; align-items: stretch; gap: 1rem; }
+      .header-actions { flex-wrap: wrap; justify-content: flex-start; }
+    }
+
+    @media (max-width: 900px) {
+      .management-container { padding: 1rem; }
+      .search-mock { width: 100%; }
+      .panel-header { flex-direction: column; align-items: flex-start; }
+      .panel-actions { flex-direction: column; align-items: stretch; }
+      .form-grid { grid-template-columns: 1fr; }
+      .span-2 { grid-column: auto; }
+      .table-container { overflow-x: auto; }
+      .modern-table { min-width: 820px; }
+    }
+
+    @media (max-width: 480px) {
+      .th-content, .modern-table td { padding: 1rem; }
+    }
   `
 })
 export class ClientesPageComponent implements OnInit {

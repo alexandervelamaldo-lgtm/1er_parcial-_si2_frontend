@@ -2,7 +2,7 @@ import { CommonModule } from '@angular/common';
 import { Component, computed, inject, signal, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { EmergencyApiService } from '../core/services/emergency-api.service';
-import { Tecnico, TecnicoCreatePayload } from '../core/models/api.models';
+import { Taller, Tecnico, TecnicoCreatePayload } from '../core/models/api.models';
 
 @Component({
   selector: 'app-tecnicos-page',
@@ -58,7 +58,12 @@ import { Tecnico, TecnicoCreatePayload } from '../core/models/api.models';
           </label>
           <label>
             Taller asignado
-            <input [(ngModel)]="createForm.taller_id" name="tallerId" type="number" placeholder="Opcional" />
+            <select [(ngModel)]="createForm.taller_id" name="tallerId">
+              <option [ngValue]="null">Seleccionar taller...</option>
+              <option *ngFor="let taller of talleres()" [ngValue]="taller.id">
+                {{ taller.nombre }}
+              </option>
+            </select>
           </label>
         </div>
 
@@ -145,7 +150,8 @@ import { Tecnico, TecnicoCreatePayload } from '../core/models/api.models';
     .panel-badge{padding:.35rem .75rem;border-radius:999px;background:#eff6ff;color:#1d4ed8;font-weight:700;font-size:.8rem}
     .form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1rem}
     .form-grid label{display:grid;gap:.45rem;font-weight:600;color:#334155}
-    .form-grid input{border:1.5px solid #dbe3ef;border-radius:12px;padding:.8rem .95rem;font:inherit}
+    .form-grid input,
+    .form-grid select{border:1.5px solid #dbe3ef;border-radius:12px;padding:.8rem .95rem;font:inherit;background:#fff}
     .feedback{margin:1rem 0 0;font-weight:600}
     .feedback.success{color:#166534}
     .feedback.error{color:#b91c1c}
@@ -219,12 +225,30 @@ import { Tecnico, TecnicoCreatePayload } from '../core/models/api.models';
     @keyframes pulse-green { 0% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.4); } 70% { box-shadow: 0 0 0 10px rgba(34, 197, 94, 0); } 100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); } }
 
     .empty-state { text-align: center; padding: 4rem; color: var(--gray); }
+
+    @media (max-width: 900px) {
+      .management-container { padding: 1rem; }
+      .page-header { flex-direction: column; align-items: stretch; gap: 1rem; }
+      .header-actions { flex-direction: column; align-items: stretch; }
+      .form-grid { grid-template-columns: 1fr; }
+      .panel-header { flex-direction: column; align-items: flex-start; }
+      .panel-actions { flex-direction: column; align-items: stretch; }
+      .stats-bar { flex-wrap: wrap; }
+    }
+
+    @media (max-width: 480px) {
+      .tech-grid { grid-template-columns: 1fr; }
+      .tech-card { padding: 1rem; }
+      .card-header { gap: 0.75rem; }
+      .status-badge { font-size: 0.6rem; }
+    }
   `
 })
 export class TecnicosPageComponent implements OnInit {
   private readonly api = inject(EmergencyApiService);
   
   readonly tecnicos = signal<Tecnico[]>([]);
+  readonly talleres = signal<Taller[]>([]);
   readonly isLoading = signal(false);
   readonly isSubmitting = signal(false);
   readonly showCreatePanel = signal(false);
@@ -259,6 +283,7 @@ export class TecnicosPageComponent implements OnInit {
       },
       error: () => this.isLoading.set(false)
     });
+    this.api.getTalleres().subscribe((data) => this.talleres.set(data));
   }
 
   toggleCreatePanel() {
@@ -280,8 +305,15 @@ export class TecnicosPageComponent implements OnInit {
   }
 
   createTecnico() {
-    if (!this.createForm.nombre || !this.createForm.email || !this.createForm.password || !this.createForm.telefono || !this.createForm.especialidad) {
-      this.errorMessage.set('Completa nombre, correo, contraseña, teléfono y especialidad.');
+    if (
+      !this.createForm.nombre ||
+      !this.createForm.email ||
+      !this.createForm.password ||
+      !this.createForm.telefono ||
+      !this.createForm.especialidad ||
+      !this.createForm.taller_id
+    ) {
+      this.errorMessage.set('Completa nombre, correo, contraseña, teléfono, especialidad y taller.');
       this.successMessage.set('');
       return;
     }
@@ -301,9 +333,10 @@ export class TecnicosPageComponent implements OnInit {
       next: (tecnico) => {
         this.tecnicos.update((items) => [tecnico, ...items]);
         const email = this.createForm.email;
+        const tallerNombre = this.talleres().find((item) => item.id === tecnico.taller_id)?.nombre ?? 'taller asignado';
         this.resetForm();
         this.showCreatePanel.set(false);
-        this.successMessage.set(`Técnico creado correctamente. Acceso: ${email}`);
+        this.successMessage.set(`Técnico creado correctamente. Acceso: ${email}. Taller: ${tallerNombre}`);
         this.isSubmitting.set(false);
       },
       error: (error) => {

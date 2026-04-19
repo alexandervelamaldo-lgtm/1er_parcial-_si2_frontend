@@ -1,10 +1,9 @@
 import { CommonModule } from '@angular/common';
 import { Component, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
-import { Router } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 
 import { AuthService } from '../core/services/auth.service';
-
 
 @Component({
   selector: 'app-login-page',
@@ -13,46 +12,186 @@ import { AuthService } from '../core/services/auth.service';
   template: `
     <section class="auth-layout">
       <div class="auth-card">
-        <span class="tag">Web para taller y operadores</span>
-        <h1>Asistencia de Emergencia Vehicular</h1>
-        <p>Accede al panel para gestionar incidentes, técnicos y clientes.</p>
+        <header>
+          <div class="brand-icon">🚨</div>
+          <span class="tag">Centro de Operaciones</span>
+          <h1>Asistencia Vehicular</h1>
+          <p>Gestión inteligente de incidentes en tiempo real.</p>
+        </header>
 
         <form [formGroup]="form" (ngSubmit)="submit()">
-          <label>
-            Correo
-            <input type="email" formControlName="email" placeholder="operador@emergency.com" />
-          </label>
-          <label>
-            Contraseña
-            <input type="password" formControlName="password" placeholder="Password123*" />
-          </label>
-          <button type="submit" [disabled]="form.invalid || loading()">Ingresar</button>
+          <div class="form-field">
+            <label>Correo Electrónico</label>
+            <input 
+              type="email" 
+              formControlName="email" 
+              placeholder="operador@emergency.com" 
+              autocomplete="email"
+            />
+          </div>
+
+          <div class="form-field">
+            <label>Contraseña</label>
+            <input 
+              type="password" 
+              formControlName="password" 
+              placeholder="••••••••" 
+              autocomplete="current-password"
+            />
+          </div>
+
+          <button type="submit" [disabled]="form.invalid || loading()" class="btn-submit">
+            <span *ngIf="!loading()">Ingresar al Panel</span>
+            <span *ngIf="loading()" class="loader"></span>
+          </button>
         </form>
 
-        <p class="helper">Usuario seed sugerido: operador@emergency.com / Password123*</p>
-        <p class="error" *ngIf="errorMessage()">{{ errorMessage() }}</p>
+        <footer class="auth-footer">
+          <div class="helper-box">
+            <strong>Acceso de prueba:</strong>
+            <code>operador@emergency.com / Password123*</code>
+          </div>
+          
+          <div class="error-msg" *ngIf="errorMessage()">
+            <span class="icon">⚠️</span> {{ errorMessage() }}
+          </div>
+        </footer>
       </div>
     </section>
   `,
   styles: `
-    .auth-layout{min-height:100vh;display:grid;place-items:center;padding:2rem;background:linear-gradient(135deg,#07122b,#102a56);}
-    .auth-card{width:min(100%,420px);padding:2rem;border-radius:24px;background:#fff;box-shadow:0 24px 80px rgba(0,0,0,.25)}
-    .tag{display:inline-block;padding:.35rem .8rem;background:#eef2ff;border-radius:999px;color:#4338ca;font-weight:700;font-size:.8rem}
-    h1{margin:1rem 0 .5rem;font-size:2rem;color:#0f172a}
-    p{color:#475569}
-    form{display:grid;gap:1rem;margin-top:1.5rem}
-    label{display:grid;gap:.45rem;color:#0f172a;font-weight:600}
-    input{padding:.9rem 1rem;border:1px solid #cbd5e1;border-radius:14px;font-size:1rem}
-    button{padding:.95rem 1rem;border:none;border-radius:14px;background:#2563eb;color:#fff;font-weight:700;cursor:pointer}
-    button:disabled{opacity:.7;cursor:not-allowed}
-    .helper{margin-top:1rem;font-size:.9rem;color:#334155}
-    .error{margin-top:1rem;color:#b91c1c;font-weight:700}
+    :host { --primary: #2563eb; --primary-dark: #1d4ed8; --bg-dark: #0f172a; }
+
+    .auth-layout {
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      padding: 1.5rem;
+      background: radial-gradient(circle at top right, #1e293b, #0f172a);
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    }
+
+    .auth-card {
+      width: min(100%, 400px);
+      padding: 2.5rem;
+      border-radius: 28px;
+      background: #ffffff;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+      animation: slideUp 0.5s ease-out;
+    }
+
+    header { text-align: center; margin-bottom: 2rem; }
+    
+    .brand-icon { font-size: 2.5rem; margin-bottom: 1rem; }
+
+    .tag {
+      display: inline-block;
+      padding: 0.25rem 0.75rem;
+      background: #eff6ff;
+      border-radius: 100px;
+      color: var(--primary);
+      font-weight: 700;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    h1 { margin: 0.75rem 0 0.25rem; font-size: 1.75rem; color: #1e293b; letter-spacing: -0.02em; }
+    p { color: #64748b; font-size: 0.95rem; }
+
+    form { display: grid; gap: 1.25rem; }
+
+    .form-field { display: grid; gap: 0.5rem; }
+    
+    label { font-size: 0.875rem; font-weight: 600; color: #334155; margin-left: 0.25rem; }
+
+    input {
+      padding: 0.85rem 1.1rem;
+      border: 1.5px solid #e2e8f0;
+      border-radius: 12px;
+      font-size: 1rem;
+      transition: all 0.2s;
+      background: #f8fafc;
+    }
+
+    input:focus {
+      outline: none;
+      border-color: var(--primary);
+      background: #fff;
+      box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.1);
+    }
+
+    .btn-submit {
+      margin-top: 0.5rem;
+      padding: 1rem;
+      border: none;
+      border-radius: 12px;
+      background: var(--primary);
+      color: #fff;
+      font-weight: 700;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .btn-submit:hover:not(:disabled) { background: var(--primary-dark); transform: translateY(-1px); }
+    .btn-submit:disabled { opacity: 0.6; cursor: not-allowed; }
+
+    .auth-footer { margin-top: 1.5rem; text-align: center; }
+
+    .helper-box {
+      padding: 0.85rem;
+      background: #f1f5f9;
+      border-radius: 12px;
+      font-size: 0.8rem;
+      color: #475569;
+      line-height: 1.4;
+    }
+
+    code { display: block; margin-top: 0.25rem; color: var(--primary); font-family: monospace; }
+
+    .error-msg {
+      margin-top: 1rem;
+      padding: 0.75rem;
+      background: #fef2f2;
+      border-radius: 10px;
+      color: #b91c1c;
+      font-size: 0.875rem;
+      font-weight: 600;
+      border: 1px solid #fee2e2;
+    }
+
+    .loader {
+      width: 20px;
+      height: 20px;
+      border: 3px solid rgba(255,255,255,0.3);
+      border-radius: 50%;
+      border-top-color: #fff;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @keyframes slideUp {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @media (max-width: 480px) {
+      .auth-layout { padding: 1rem; }
+      .auth-card { padding: 1.5rem; border-radius: 20px; }
+      h1 { font-size: 1.45rem; }
+      code { word-break: break-word; }
+    }
   `
 })
 export class LoginPageComponent {
   private readonly fb = inject(FormBuilder);
   private readonly authService = inject(AuthService);
   private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
 
   readonly loading = signal(false);
   readonly errorMessage = signal('');
@@ -62,10 +201,14 @@ export class LoginPageComponent {
     password: ['Password123*', [Validators.required, Validators.minLength(6)]]
   });
 
-  submit() {
-    if (this.form.invalid) {
-      return;
+  constructor() {
+    if (this.route.snapshot.queryParamMap.get('blocked') === 'client') {
+      this.errorMessage.set('Los clientes no pueden ingresar desde la web. Usa la aplicación móvil.');
     }
+  }
+
+  submit() {
+    if (this.form.invalid) return;
 
     this.loading.set(true);
     this.errorMessage.set('');
@@ -78,8 +221,19 @@ export class LoginPageComponent {
       },
       error: (error) => {
         this.loading.set(false);
-        this.errorMessage.set(error?.error?.detail ?? 'No se pudo iniciar sesión.');
+        this.errorMessage.set(this.getErrorMessage(error));
       }
     });
+  }
+
+  private getErrorMessage(error: { error?: { detail?: unknown }; message?: string }): string {
+    const detail = error?.error?.detail;
+    if (typeof detail === 'string' && detail.trim()) {
+      return detail;
+    }
+    if (typeof error?.message === 'string' && error.message.trim()) {
+      return error.message;
+    }
+    return 'Credenciales incorrectas o error de conexión.';
   }
 }

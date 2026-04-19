@@ -9,13 +9,17 @@ import {
   CurrentUserProfile,
   EstadoSolicitudOption,
   Notificacion,
+  Pago,
+  PagoSolicitudPayload,
   Solicitud,
   SolicitudCandidatos,
   SolicitudDetalle,
   SolicitudSeguimiento,
   Taller,
   Tecnico,
-  TecnicoCreatePayload
+  TecnicoCreatePayload,
+  TrabajoFinalizadoPayload,
+  TrabajoRealizadoListResponse
 } from '../models/api.models';
 
 
@@ -112,6 +116,65 @@ export class EmergencyApiService {
     );
   }
 
+  registrarPagoSolicitud(solicitudId: number, payload: PagoSolicitudPayload) {
+    return this.http.post<Pago>(
+      `${environment.apiUrl}/solicitudes/${solicitudId}/pago`,
+      payload,
+      { headers: this.headers }
+    );
+  }
+
+  registrarTrabajoFinalizado(solicitudId: number, payload: TrabajoFinalizadoPayload) {
+    return this.http.put<Solicitud>(
+      `${environment.apiUrl}/solicitudes/${solicitudId}/trabajo-finalizado`,
+      payload,
+      { headers: this.headers }
+    );
+  }
+
+  getFacturaSolicitudUrl(solicitudId: number) {
+    const token = this.authService.getToken();
+    if (!token) {
+      return `${environment.apiUrl}/solicitudes/${solicitudId}/factura.pdf`;
+    }
+    return `${environment.apiUrl}/solicitudes/${solicitudId}/factura.pdf?access_token=${encodeURIComponent(token)}`;
+  }
+
+  getTrabajosRealizados(filters: { desde?: string | null; hasta?: string | null; tecnico_id?: number | null; taller_id?: number | null }) {
+    const params: Record<string, string> = {};
+    if (filters.desde) params['desde'] = filters.desde;
+    if (filters.hasta) params['hasta'] = filters.hasta;
+    if (filters.tecnico_id) params['tecnico_id'] = String(filters.tecnico_id);
+    if (filters.taller_id) params['taller_id'] = String(filters.taller_id);
+    return this.http.get<TrabajoRealizadoListResponse>(`${environment.apiUrl}/solicitudes/trabajos`, {
+      headers: this.headers,
+      params
+    });
+  }
+
+  private buildTrabajosExportUrl(
+    extension: 'pdf' | 'csv',
+    filters: { desde?: string | null; hasta?: string | null; tecnico_id?: number | null; taller_id?: number | null }
+  ) {
+    const token = this.authService.getToken();
+    const params = new URLSearchParams();
+    if (token) params.set('access_token', token);
+    if (filters.desde) params.set('desde', filters.desde);
+    if (filters.hasta) params.set('hasta', filters.hasta);
+    if (filters.tecnico_id) params.set('tecnico_id', String(filters.tecnico_id));
+    if (filters.taller_id) params.set('taller_id', String(filters.taller_id));
+    const query = params.toString();
+    return `${environment.apiUrl}/solicitudes/trabajos.${extension}${query ? `?${query}` : ''}`;
+  }
+
+  getTrabajosRealizadosPdfUrl(filters: { desde?: string | null; hasta?: string | null; tecnico_id?: number | null; taller_id?: number | null }) {
+    return this.buildTrabajosExportUrl('pdf', filters);
+  }
+
+  getTrabajosRealizadosCsvUrl(filters: { desde?: string | null; hasta?: string | null; tecnico_id?: number | null; taller_id?: number | null }) {
+    return this.buildTrabajosExportUrl('csv', filters);
+  }
+
   revisarManual(solicitudId: number, confianza: number, prioridad: string, resumenIa: string, motivoPrioridad: string) {
     return this.http.put<Solicitud>(
       `${environment.apiUrl}/solicitudes/${solicitudId}/revision-manual`,
@@ -141,6 +204,12 @@ export class EmergencyApiService {
 
   createTecnico(payload: TecnicoCreatePayload) {
     return this.http.post<Tecnico>(`${environment.apiUrl}/tecnicos`, payload, {
+      headers: this.headers
+    });
+  }
+
+  getTalleres() {
+    return this.http.get<Taller[]>(`${environment.apiUrl}/talleres`, {
       headers: this.headers
     });
   }

@@ -52,6 +52,18 @@ import { EmergencyApiService } from '../core/services/emergency-api.service';
                 <label>Aprobación cliente</label>
                 <strong>{{ approvalLabel(solicitud.cliente_aprobada) }}</strong>
               </div>
+              <div class="info-item">
+                <label>Contexto vial</label>
+                <strong>{{ solicitud.es_carretera ? 'Carretera' : 'Zona urbana' }}</strong>
+              </div>
+              <div class="info-item">
+                <label>Riesgo reportado</label>
+                <strong>{{ solicitud.nivel_riesgo ?? '--' }}/5</strong>
+              </div>
+              <div class="info-item">
+                <label>Condición del vehículo</label>
+                <strong>{{ solicitud.condicion_vehiculo || 'Sin dato' }}</strong>
+              </div>
               <div class="info-item full">
                 <label>Descripción</label>
                 <p>{{ solicitud.descripcion }}</p>
@@ -65,6 +77,43 @@ import { EmergencyApiService } from '../core/services/emergency-api.service';
                 <strong>{{ solicitud.propuesta_expira_en | date: 'short' }}</strong>
               </div>
             </div>
+          </article>
+
+          <article class="glass-card estimate-card">
+            <div class="card-header">
+              <h3>Costo estimado</h3>
+              <span class="metric-pill" *ngIf="solicitud.costo_estimacion_confianza !== null && solicitud.costo_estimacion_confianza !== undefined">
+                Confianza {{ (solicitud.costo_estimacion_confianza * 100) | number: '1.0-0' }}%
+              </span>
+            </div>
+            <ng-container *ngIf="hasEstimatedCost(); else noEstimate">
+              <div class="estimate-main">
+                <strong>{{ formatBs(solicitud.costo_estimado) }}</strong>
+                <span>aproximado</span>
+              </div>
+              <p class="subtle" *ngIf="solicitud.costo_estimado_min !== null && solicitud.costo_estimado_max !== null">
+                Rango esperado {{ formatBs(solicitud.costo_estimado_min) }} a {{ formatBs(solicitud.costo_estimado_max) }}
+              </p>
+              <p class="subtle" *ngIf="solicitud.costo_estimacion_nota">{{ solicitud.costo_estimacion_nota }}</p>
+            </ng-container>
+            <ng-template #noEstimate>
+              <p class="subtle">La estimación aún no está disponible para esta solicitud.</p>
+            </ng-template>
+          </article>
+
+          <article class="glass-card estimate-card" *ngIf="hasFinalCost()">
+            <div class="card-header">
+              <h3>Cierre técnico</h3>
+              <span class="metric-pill tag-success" *ngIf="solicitud.trabajo_terminado">Trabajo realizado</span>
+            </div>
+            <div class="estimate-main">
+              <strong>{{ formatBs(solicitud.costo_final) }}</strong>
+              <span>costo final en Bs</span>
+            </div>
+            <p class="subtle" *ngIf="solicitud.trabajo_terminado_en">
+              Registrado {{ solicitud.trabajo_terminado_en | date: 'medium' }}
+            </p>
+            <p class="subtle" *ngIf="solicitud.trabajo_terminado_observacion">{{ solicitud.trabajo_terminado_observacion }}</p>
           </article>
 
           <article class="glass-card ia-insight" *ngIf="showAiBlock()">
@@ -101,16 +150,29 @@ import { EmergencyApiService } from '../core/services/emergency-api.service';
             </ul>
           </article>
 
-          <article class="glass-card" *ngIf="solicitud.pagos.length">
+          <article class="glass-card">
             <div class="card-header">
               <h3>Pagos y comisión</h3>
             </div>
+            <div class="payment-summary" *ngIf="latestPayment() as latest; else noPayment">
+              <div class="payment-main">
+                <strong>{{ formatBs(latest.monto_total) }}</strong>
+                <span class="tag" [class.tag-success]="latest.estado === 'PAGADO'">{{ latest.estado }}</span>
+              </div>
+              <p class="subtle">
+                Método {{ latest.metodo_pago }} · Taller {{ formatBs(latest.monto_taller) }} · Comisión {{ formatBs(latest.monto_comision) }}
+              </p>
+              <p class="subtle" *ngIf="latest.referencia_externa">Referencia {{ latest.referencia_externa }}</p>
+            </div>
+            <ng-template #noPayment>
+              <p class="subtle">Todavía no hay pagos registrados para esta solicitud.</p>
+            </ng-template>
             <div class="payment-item" *ngFor="let pago of solicitud.pagos">
               <div class="payment-main">
-                <strong>{{ pago.monto_total | currency }}</strong>
-                <span class="tag">{{ pago.estado }}</span>
+                <strong>{{ formatBs(pago.monto_total) }}</strong>
+                <span class="tag" [class.tag-success]="pago.estado === 'PAGADO'">{{ pago.estado }}</span>
               </div>
-              <small>Taller {{ pago.monto_taller | currency }} · Comisión {{ pago.monto_comision | currency }}</small>
+              <small>{{ pago.metodo_pago }} · Taller {{ formatBs(pago.monto_taller) }} · Comisión {{ formatBs(pago.monto_comision) }}</small>
             </div>
           </article>
 
@@ -147,6 +209,49 @@ import { EmergencyApiService } from '../core/services/emergency-api.service';
         </div>
 
         <aside class="actions-column">
+          <article class="glass-card action-box payment-box">
+            <h3>Pago del cliente</h3>
+            <p class="subtle" *ngIf="latestPayment() as latest">
+              Estado actual {{ latest.estado }} por {{ formatBs(latest.monto_total) }} mediante {{ latest.metodo_pago }}.
+            </p>
+            <p class="subtle" *ngIf="!latestPayment()">
+              El pago final queda habilitado cuando el técnico registra el trabajo realizado y el costo final en Bs.
+            </p>
+            <ng-container *ngIf="canManagePayment(); else paymentReadOnly">
+              <div class="form-group">
+                <label>Método de pago</label>
+                <select [(ngModel)]="paymentMethod" class="modern-select">
+                  <option value="tarjeta">Tarjeta</option>
+                  <option value="transferencia">Transferencia</option>
+                  <option value="efectivo">Efectivo</option>
+                  <option value="billetera">Billetera digital</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Monto final en Bs</label>
+                <input [(ngModel)]="paymentAmount" type="number" min="0" step="0.01" class="modern-select" />
+              </div>
+              <div class="form-group">
+                <label>Referencia</label>
+                <input [(ngModel)]="paymentReference" class="modern-select" />
+              </div>
+              <textarea [(ngModel)]="paymentNote" rows="3" class="modern-area" placeholder="Detalle del pago"></textarea>
+              <div class="button-row">
+                <button class="btn-dark" (click)="submitPayment(false)">Registrar</button>
+                <button class="btn-success" (click)="submitPayment(true)">Confirmar pago</button>
+              </div>
+            </ng-container>
+            <ng-template #paymentReadOnly>
+              <p class="subtle">El pago del cliente se confirma desde la app móvil. Aquí queda visible el estado y la factura final.</p>
+            </ng-template>
+          </article>
+
+          <article class="glass-card action-box" *ngIf="canDownloadInvoice()">
+            <h3>Factura PDF</h3>
+            <p class="subtle">Cliente, operador y administrador pueden descargar el comprobante del servicio ya pagado.</p>
+            <button class="btn-primary full" (click)="openInvoice()">Descargar factura</button>
+          </article>
+
           <article class="glass-card tracking-card" *ngIf="seguimiento() as track">
             <div class="live-tag" [attr.data-live]="track.tracking_activo">TRACK</div>
             <h3>Seguimiento</h3>
@@ -237,13 +342,23 @@ import { EmergencyApiService } from '../core/services/emergency-api.service';
             <button class="btn-dark full" (click)="reviewManually()">Cerrar revisión</button>
           </article>
 
-          <article class="glass-card action-box" *ngIf="canChangeTo('EN_ATENCION') || canChangeTo('COMPLETADA')">
+          <article class="glass-card action-box" *ngIf="canChangeTo('EN_ATENCION')">
             <h3>Actualizar progreso</h3>
             <textarea [(ngModel)]="statusNote" class="modern-area" placeholder="Notas de avance"></textarea>
             <div class="button-row">
               <button class="btn-dark" *ngIf="canChangeTo('EN_ATENCION')" (click)="changeStatus('EN_ATENCION')">En atención</button>
-              <button class="btn-success" *ngIf="canChangeTo('COMPLETADA')" (click)="changeStatus('COMPLETADA')">Completar</button>
             </div>
+          </article>
+
+          <article class="glass-card action-box" *ngIf="canFinalizeTechnicalWork()">
+            <h3>Trabajo realizado</h3>
+            <p class="subtle">El técnico registra el costo final real en bolivianos. La solicitud se completará cuando el cliente confirme el pago.</p>
+            <div class="form-group">
+              <label>Costo final en Bs</label>
+              <input [(ngModel)]="finalCostAmount" type="number" min="0" step="0.01" class="modern-select" />
+            </div>
+            <textarea [(ngModel)]="finalizationNote" class="modern-area" placeholder="Resumen del trabajo realizado"></textarea>
+            <button class="btn-success full" (click)="submitTechnicalClosure()">Registrar trabajo hecho</button>
           </article>
 
           <article class="glass-card action-box" *ngIf="canCancel()">
@@ -260,8 +375,8 @@ import { EmergencyApiService } from '../core/services/emergency-api.service';
     .detail-container { padding: 1.5rem; background: var(--bg); min-height: 100vh; }
     .detail-header { margin-bottom: 2rem; }
     .btn-back { text-decoration: none; color: var(--primary); font-weight: 700; }
-    .header-main { display: flex; justify-content: space-between; align-items: center; gap: 1rem; margin-top: 1rem; }
-    .title-info { display: flex; gap: 1rem; align-items: center; }
+    .header-main { display: flex; justify-content: space-between; align-items: center; gap: 1rem; margin-top: 1rem; flex-wrap: wrap; }
+    .title-info { display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; }
     h1, h3 { margin: 0; color: var(--dark); }
     .main-grid { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 1.5rem; }
     .glass-card { background: white; border: 1px solid #e2e8f0; border-radius: 18px; padding: 1.25rem; margin-bottom: 1.25rem; box-shadow: 0 8px 24px rgba(15, 23, 42, 0.05); }
@@ -271,22 +386,25 @@ import { EmergencyApiService } from '../core/services/emergency-api.service';
     .info-item label { display: block; font-size: 0.75rem; text-transform: uppercase; color: #64748b; font-weight: 700; margin-bottom: 0.25rem; }
     .info-item p { margin: 0; color: #334155; line-height: 1.5; }
     code { background: #eff6ff; padding: 0.35rem 0.5rem; border-radius: 8px; }
-    .ia-insight { background: linear-gradient(135deg, #ffffff, #f5f3ff); }
+    .ia-insight, .estimate-card { background: linear-gradient(135deg, #ffffff, #f5f3ff); }
     .ia-metrics, .tag-list, .signal-row { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem; }
     .metric-pill, .tag, .signal-pill, .badge-status, .priority-tag { padding: 0.35rem 0.7rem; border-radius: 999px; font-size: 0.75rem; font-weight: 700; }
     .metric-pill, .tag, .signal-pill, .badge-status { background: #e2e8f0; color: #334155; }
     .metric-pill.warning, .signal-pill.warning { background: #fef3c7; color: #92400e; }
+    .tag-success { background: #dcfce7; color: #166534; }
     .priority-tag[data-priority="CRITICA"] { background: #fee2e2; color: #b91c1c; }
     .priority-tag[data-priority="ALTA"] { background: #ffedd5; color: #c2410c; }
     .badge-status[data-status="ASIGNADA"] { background: #dbeafe; color: #1d4ed8; }
     .badge-status[data-status="EN_CAMINO"] { background: #dbeafe; color: #1e40af; }
     .badge-status[data-status="EN_ATENCION"] { background: #fef3c7; color: #92400e; }
     .resumen { color: #4c1d95; font-weight: 600; }
+    .estimate-main { display: flex; align-items: baseline; gap: 0.5rem; margin-bottom: 0.5rem; }
+    .estimate-main strong { font-size: 2rem; color: #4c1d95; }
     .subtle { color: #64748b; margin: 0.4rem 0 0; line-height: 1.5; }
     .alert-box { background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 12px; padding: 0.8rem; }
     .alert-box p { margin: 0.35rem 0 0; }
     .stack-list { display: grid; gap: 0.8rem; }
-    .stack-list li, .candidate-card, .payment-item { display: grid; gap: 0.25rem; }
+    .stack-list li, .candidate-card, .payment-item, .payment-summary { display: grid; gap: 0.25rem; }
     .payment-main { display: flex; justify-content: space-between; align-items: center; }
     .timeline { position: relative; padding-left: 1.25rem; border-left: 2px solid #e2e8f0; }
     .timeline-event { position: relative; margin-bottom: 1rem; }
@@ -309,7 +427,7 @@ import { EmergencyApiService } from '../core/services/emergency-api.service';
     .form-group label { display: block; color: #64748b; font-size: 0.8rem; font-weight: 700; margin-bottom: 0.35rem; }
     .modern-select, .modern-area { width: 100%; padding: 0.75rem; border: 1px solid #cbd5e1; border-radius: 12px; background: #f8fafc; }
     .modern-area { resize: vertical; min-height: 90px; }
-    .button-row { display: flex; gap: 0.75rem; }
+    .button-row { display: flex; gap: 0.75rem; flex-wrap: wrap; }
     button { border: none; border-radius: 12px; padding: 0.8rem 1rem; font-weight: 700; cursor: pointer; }
     .btn-primary, .btn-dark, .btn-success, .btn-danger, .btn-danger-ghost { width: 100%; }
     .btn-primary { background: var(--primary); color: white; }
@@ -317,7 +435,28 @@ import { EmergencyApiService } from '../core/services/emergency-api.service';
     .btn-success { background: var(--success); color: white; }
     .btn-danger { background: var(--danger); color: white; }
     .btn-danger-ghost { background: transparent; color: var(--danger); border: 1px solid #fecaca; }
-    @media (max-width: 1000px) { .main-grid { grid-template-columns: 1fr; } }
+    @media (max-width: 1000px) {
+      .main-grid { grid-template-columns: 1fr; }
+    }
+
+    @media (max-width: 900px) {
+      .detail-container { padding: 1rem; }
+      .header-main { flex-direction: column; align-items: flex-start; }
+      .priority-tag { align-self: flex-start; }
+      .info-grid { grid-template-columns: 1fr; }
+      .event-header { flex-direction: column; align-items: flex-start; }
+      .payment-main { flex-direction: column; align-items: flex-start; gap: 0.35rem; }
+      .timeline { padding-left: 1rem; }
+      .event-dot { left: -1.45rem; }
+    }
+
+    @media (max-width: 640px) {
+      .glass-card { padding: 1rem; border-radius: 16px; }
+      .button-row { flex-direction: column; }
+      button { width: 100%; }
+      .estimate-main strong { font-size: 1.6rem; }
+      code { display: inline-block; max-width: 100%; overflow: auto; }
+    }
   `
 })
 export class SolicitudDetallePageComponent {
@@ -337,6 +476,12 @@ export class SolicitudDetallePageComponent {
   assignmentNote = 'Confirmo disponibilidad operativa';
   workshopNote = 'El taller confirma cobertura';
   clientNote = 'Apruebo el taller sugerido para continuar';
+  paymentMethod = 'tarjeta';
+  paymentAmount: number | null = null;
+  paymentReference = '';
+  paymentNote = 'Registro de pago realizado por el cliente';
+  finalCostAmount: number | null = null;
+  finalizationNote = 'Trabajo realizado y listo para facturar al cliente';
   statusNote = 'Actualización registrada desde la web';
   cancelNote = 'Cancelación solicitada por el usuario';
   manualSummary = 'Clasificación validada manualmente por operación';
@@ -359,6 +504,12 @@ export class SolicitudDetallePageComponent {
       }
       if (!this.selectedTechnicianId && data.tecnico_id) {
         this.selectedTechnicianId = data.tecnico_id;
+      }
+      if (this.finalCostAmount === null && data.costo_final !== null && data.costo_final !== undefined) {
+        this.finalCostAmount = data.costo_final;
+      }
+      if (this.paymentAmount === null) {
+        this.paymentAmount = data.costo_final ?? data.costo_estimado ?? null;
       }
     });
     this.api.getSeguimientoSolicitud(id).subscribe((data) => this.seguimiento.set(data));
@@ -393,9 +544,39 @@ export class SolicitudDetallePageComponent {
     );
   }
 
+  hasEstimatedCost(): boolean {
+    return this.solicitud()?.costo_estimado !== null && this.solicitud()?.costo_estimado !== undefined;
+  }
+
+  hasFinalCost(): boolean {
+    return this.solicitud()?.costo_final !== null && this.solicitud()?.costo_final !== undefined;
+  }
+
+  formatBs(amount: number | null | undefined): string {
+    const safeAmount = Number(amount ?? 0);
+    return `Bs ${safeAmount.toLocaleString('es-BO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  }
+
+  latestPayment() {
+    return this.solicitud()?.pagos?.[0] ?? null;
+  }
+
   isClientApprovalPending(): boolean {
     const current = this.solicitud();
     return this.roleNames().includes('CLIENTE') && current?.estado?.nombre === 'ASIGNADA' && current.cliente_aprobada === false;
+  }
+
+  canManagePayment(): boolean {
+    const current = this.solicitud();
+    const currentState = current?.estado?.nombre;
+    return Boolean(
+      this.roleNames().includes('CLIENTE') &&
+      currentState &&
+      ['EN_ATENCION', 'COMPLETADA'].includes(currentState) &&
+      currentState !== 'CANCELADA' &&
+      current?.cliente_aprobada !== false &&
+      current?.trabajo_terminado === true
+    );
   }
 
   assign() {
@@ -455,6 +636,33 @@ export class SolicitudDetallePageComponent {
     }
   }
 
+  submitPayment(confirmarPago: boolean) {
+    const current = this.solicitud();
+    const monto = this.paymentAmount ?? current?.costo_final ?? current?.costo_estimado ?? null;
+    if (!current || !monto || monto <= 0) {
+      return;
+    }
+    this.api.registrarPagoSolicitud(current.id, {
+      monto_total: monto,
+      metodo_pago: this.paymentMethod,
+      referencia_externa: this.paymentReference.trim() || null,
+      observacion: this.paymentNote.trim() || null,
+      confirmar_pago: confirmarPago
+    }).subscribe(() => this.reload());
+  }
+
+  submitTechnicalClosure() {
+    const current = this.solicitud();
+    const amount = this.finalCostAmount ?? current?.costo_estimado ?? null;
+    if (!current || !amount || amount <= 0 || this.finalizationNote.trim().length < 5) {
+      return;
+    }
+    this.api.registrarTrabajoFinalizado(current.id, {
+      costo_final: amount,
+      observacion: this.finalizationNote.trim()
+    }).subscribe(() => this.reload());
+  }
+
   canRespondAssignment(): boolean {
     const current = this.solicitud();
     return this.roleNames().includes('TECNICO') && current?.estado?.nombre === 'ASIGNADA' && current.cliente_aprobada === true;
@@ -475,7 +683,7 @@ export class SolicitudDetallePageComponent {
       return false;
     }
     const canOperate = this.roleNames().some((role) => ['ADMINISTRADOR', 'OPERADOR', 'TECNICO'].includes(role));
-    return canOperate && ((currentState === 'EN_CAMINO' && target === 'EN_ATENCION') || (currentState === 'EN_ATENCION' && target === 'COMPLETADA'));
+    return canOperate && currentState === 'EN_CAMINO' && target === 'EN_ATENCION';
   }
 
   canCancel(): boolean {
@@ -485,6 +693,25 @@ export class SolicitudDetallePageComponent {
     }
     const roles = this.roleNames();
     return roles.includes('ADMINISTRADOR') || roles.includes('OPERADOR') || (roles.includes('CLIENTE') && currentState !== 'EN_ATENCION');
+  }
+
+  canFinalizeTechnicalWork(): boolean {
+    const current = this.solicitud();
+    return this.roleNames().includes('TECNICO') && current?.estado?.nombre === 'EN_ATENCION' && current?.trabajo_terminado !== true;
+  }
+
+  canDownloadInvoice(): boolean {
+    const roles = this.roleNames();
+    const allowedRole = roles.some((role) => ['CLIENTE', 'OPERADOR', 'ADMINISTRADOR'].includes(role));
+    return allowedRole && this.latestPayment()?.estado === 'PAGADO';
+  }
+
+  openInvoice() {
+    const current = this.solicitud();
+    if (!current) {
+      return;
+    }
+    window.open(this.api.getFacturaSolicitudUrl(current.id), '_blank', 'noopener,noreferrer');
   }
 }
 

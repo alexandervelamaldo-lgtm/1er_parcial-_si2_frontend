@@ -127,6 +127,21 @@ import { EmergencyApiService } from '../core/services/emergency-api.service';
 
     .empty-state { text-align: center; padding: 5rem 1rem; color: var(--gray); }
     .empty-icon { font-size: 3rem; margin-bottom: 1rem; opacity: 0.3; }
+
+    @media (max-width: 900px) {
+      .management-container { padding: 1rem; }
+      .page-header { flex-direction: column; align-items: stretch; gap: 1rem; }
+      .header-actions { justify-content: space-between; flex-wrap: wrap; }
+      .notifications-feed { max-width: none; }
+    }
+
+    @media (max-width: 640px) {
+      .notification-card { grid-template-columns: 1fr; }
+      .status-indicator { justify-content: flex-start; padding-top: 0; }
+      .notification-body header { flex-direction: column; align-items: flex-start; gap: 0.35rem; }
+      .notification-actions { justify-content: flex-end; }
+      .meta { flex-wrap: wrap; }
+    }
   `
 })
 export class NotificacionesPageComponent implements OnInit {

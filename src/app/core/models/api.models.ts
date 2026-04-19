@@ -41,6 +41,9 @@ export interface Solicitud {
   prioridad: 'BAJA' | 'MEDIA' | 'ALTA' | 'CRITICA';
   latitud_incidente: number;
   longitud_incidente: number;
+  es_carretera?: boolean;
+  condicion_vehiculo?: string;
+  nivel_riesgo?: number;
   fecha_solicitud: string;
   fecha_asignacion?: string | null;
   fecha_atencion?: string | null;
@@ -52,6 +55,16 @@ export interface Solicitud {
   etiquetas_ia?: string | null;
   transcripcion_audio?: string | null;
   proveedor_ia?: string | null;
+  costo_estimado?: number | null;
+  costo_estimado_min?: number | null;
+  costo_estimado_max?: number | null;
+  costo_estimacion_confianza?: number | null;
+  costo_estimacion_nota?: string | null;
+  costo_final?: number | null;
+  moneda_costo?: string;
+  trabajo_terminado?: boolean;
+  trabajo_terminado_en?: string | null;
+  trabajo_terminado_observacion?: string | null;
   cliente_aprobada?: boolean | null;
   cliente_aprobacion_observacion?: string | null;
   cliente_aprobacion_fecha?: string | null;
@@ -186,6 +199,48 @@ export interface Pago {
   observacion?: string | null;
   fecha_creacion: string;
   fecha_pago?: string | null;
+}
+
+export interface PagoSolicitudPayload {
+  monto_total?: number | null;
+  metodo_pago: string;
+  referencia_externa?: string | null;
+  observacion?: string | null;
+  confirmar_pago?: boolean;
+}
+
+export interface TrabajoFinalizadoPayload {
+  costo_final: number;
+  observacion: string;
+}
+
+export interface TrabajoRealizadoItem {
+  solicitud_id: number;
+  fecha_cierre: string;
+  cliente: string;
+  taller: string;
+  tecnico: string;
+  tipo_incidente: string;
+  costo_estimado?: number | null;
+  costo_final: number;
+  monto_total: number;
+  monto_comision: number;
+  monto_taller: number;
+  metodo_pago: string;
+  estado_pago: string;
+}
+
+export interface TrabajoRealizadoResumen {
+  cantidad_trabajos: number;
+  total_facturado: number;
+  total_comision: number;
+  total_taller: number;
+  promedio_por_trabajo: number;
+}
+
+export interface TrabajoRealizadoListResponse {
+  items: TrabajoRealizadoItem[];
+  resumen: TrabajoRealizadoResumen;
 }
 
 export interface Disputa {

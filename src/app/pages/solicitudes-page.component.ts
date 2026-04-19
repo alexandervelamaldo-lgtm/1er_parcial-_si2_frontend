@@ -45,6 +45,8 @@ import { EstadoSolicitudOption, Solicitud, Tecnico } from '../core/models/api.mo
               <span class="mini-tag" *ngIf="solicitud.requiere_revision_manual">Revisión IA</span>
               <span class="mini-tag" *ngIf="solicitud.cliente_aprobada === false">Pendiente cliente</span>
               <span class="mini-tag success" *ngIf="solicitud.cliente_aprobada === true">Cliente aprobó</span>
+              <span class="mini-tag warning" *ngIf="solicitud.costo_estimado">Estimado {{ formatBs(solicitud.costo_estimado) }}</span>
+              <span class="mini-tag success" *ngIf="solicitud.trabajo_terminado && solicitud.costo_final">Trabajo hecho {{ formatBs(solicitud.costo_final) }}</span>
               <span class="mini-tag" *ngIf="solicitud.etiquetas_ia">{{ solicitud.etiquetas_ia }}</span>
             </div>
             
@@ -81,12 +83,6 @@ import { EstadoSolicitudOption, Solicitud, Tecnico } from '../core/models/api.mo
                 (click)="changeStatusByName(solicitud.id, 'EN_ATENCION', 'Servicio iniciado desde panel web')">
                 Iniciar Atención
               </button>
-              <button
-                class="btn-flow success"
-                *ngIf="canAdvanceTo(solicitud, 'COMPLETADA')"
-                (click)="changeStatusByName(solicitud.id, 'COMPLETADA', 'Caso cerrado desde panel web')">
-                Cerrar Caso
-              </button>
             </div>
           </div>
         </article>
@@ -119,7 +115,7 @@ import { EstadoSolicitudOption, Solicitud, Tecnico } from '../core/models/api.mo
     .request-card:hover { transform: translateY(-2px); border-color: #e2e8f0; }
 
     /* Info de la solicitud */
-    .request-info header { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1rem; }
+    .request-info header { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1rem; flex-wrap: wrap; }
     .id-tag { font-family: monospace; font-weight: 800; color: var(--gray); font-size: 1.1rem; }
     .incident-type { font-weight: 700; color: var(--dark); font-size: 1.1rem; }
     
@@ -133,8 +129,9 @@ import { EstadoSolicitudOption, Solicitud, Tecnico } from '../core/models/api.mo
     .secondary-tags { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1rem; }
     .mini-tag { background: #e2e8f0; color: #334155; border-radius: 999px; padding: 0.25rem 0.55rem; font-size: 0.72rem; font-weight: 700; }
     .mini-tag.success { background: #dcfce7; color: #166534; }
+    .mini-tag.warning { background: #fef3c7; color: #92400e; }
 
-    .metadata { display: flex; gap: 1.5rem; font-size: 0.85rem; color: var(--gray); padding-top: 1rem; border-top: 1px solid #f8fafc; }
+    .metadata { display: flex; gap: 1.5rem; font-size: 0.85rem; color: var(--gray); padding-top: 1rem; border-top: 1px solid #f8fafc; flex-wrap: wrap; }
     .status-indicator { display: flex; align-items: center; gap: 0.5rem; }
     .status-dot { width: 8px; height: 8px; border-radius: 50%; background: #cbd5e1; }
     .status-dot[data-status="EN_CAMINO"] { background: #3b82f6; box-shadow: 0 0 8px #3b82f6; }
@@ -168,8 +165,18 @@ import { EstadoSolicitudOption, Solicitud, Tecnico } from '../core/models/api.mo
     .empty-icon { font-size: 3rem; margin-bottom: 1rem; opacity: 0.5; }
 
     @media (max-width: 900px) {
+      .management-container { padding: 1rem; }
+      .page-header { flex-direction: column; align-items: stretch; gap: 1rem; }
+      .btn-refresh { width: 100%; justify-content: center; }
       .request-card { grid-template-columns: 1fr; gap: 1rem; }
       .request-actions { border-left: none; padding-left: 0; border-top: 1px solid #f1f5f9; padding-top: 1rem; }
+    }
+
+    @media (max-width: 640px) {
+      .request-card { padding: 1rem; }
+      .assign-zone, .status-workflow { gap: 0.75rem; }
+      .btn-detail, .btn-assign, .btn-flow { width: 100%; }
+      .tech-select { width: 100%; }
     }
   `
 })
@@ -214,14 +221,17 @@ export class SolicitudesPageComponent {
     this.api.actualizarEstado(solicitudId, estadoId, observacion).subscribe(() => this.loadData());
   }
 
+  formatBs(amount: number | null | undefined) {
+    const safeAmount = Number(amount ?? 0);
+    return `Bs ${safeAmount.toLocaleString('es-BO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  }
+
   canAdvanceTo(solicitud: Solicitud, targetState: string) {
     const currentState = solicitud.estado?.nombre;
     if (!currentState) return false;
 
-    // Lógica unificada: tanto operadores como técnicos pueden avanzar el flujo una vez iniciado
     const validTransitions: Record<string, string> = {
-      'EN_CAMINO': 'EN_ATENCION',
-      'EN_ATENCION': 'COMPLETADA'
+      'EN_CAMINO': 'EN_ATENCION'
     };
 
     return validTransitions[currentState] === targetState;

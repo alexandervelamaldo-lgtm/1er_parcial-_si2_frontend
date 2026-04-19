@@ -24,6 +24,7 @@ export class App {
     { label: 'Solicitudes', path: '/solicitudes', roles: ['ADMINISTRADOR', 'OPERADOR', 'TECNICO', 'TALLER'] },
     { label: 'Técnicos', path: '/tecnicos', roles: ['ADMINISTRADOR', 'OPERADOR'] },
     { label: 'Clientes', path: '/clientes', roles: ['ADMINISTRADOR', 'OPERADOR'] },
+    { label: 'Trabajos', path: '/trabajos', roles: ['ADMINISTRADOR', 'OPERADOR', 'TALLER'] },
     { label: 'Historial', path: '/historial' },
     { label: 'Notificaciones', path: '/notificaciones' },
     { label: 'Perfil', path: '/perfil' }

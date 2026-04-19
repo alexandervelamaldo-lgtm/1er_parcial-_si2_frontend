@@ -11,6 +11,7 @@ import { PerfilPageComponent } from './pages/perfil-page.component';
 import { SolicitudDetallePageComponent } from './pages/solicitud-detalle-page.component';
 import { SolicitudesPageComponent } from './pages/solicitudes-page.component';
 import { TecnicosPageComponent } from './pages/tecnicos-page.component';
+import { TrabajosPageComponent } from './pages/trabajos-page.component';
 
 export const routes: Routes = [
   {
@@ -26,6 +27,7 @@ export const routes: Routes = [
       { path: 'solicitudes/:id', component: SolicitudDetallePageComponent, canActivate: [roleGuard(['ADMINISTRADOR', 'OPERADOR', 'TECNICO', 'TALLER'])] },
       { path: 'tecnicos', component: TecnicosPageComponent, canActivate: [roleGuard(['ADMINISTRADOR', 'OPERADOR'])] },
       { path: 'clientes', component: ClientesPageComponent, canActivate: [roleGuard(['ADMINISTRADOR', 'OPERADOR'])] },
+      { path: 'trabajos', component: TrabajosPageComponent, canActivate: [roleGuard(['ADMINISTRADOR', 'OPERADOR', 'TALLER'])] },
       { path: 'historial', component: HistorialPageComponent },
       { path: 'notificaciones', component: NotificacionesPageComponent },
       { path: 'perfil', component: PerfilPageComponent },

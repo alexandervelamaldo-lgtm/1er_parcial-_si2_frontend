@@ -172,7 +172,7 @@ interface IncidentePunto {
 
     /* Tabla */
     .table-responsive { overflow-x: auto; }
-    table { width: 100%; border-collapse: collapse; }
+    table { width: 100%; min-width: 680px; border-collapse: collapse; }
     th { background: #f8fafc; padding: 1rem; text-align: left; font-size: 0.75rem; text-transform: uppercase; color: #64748b; letter-spacing: 0.05em; }
     td { padding: 1rem; border-bottom: 1px solid #f1f5f9; font-size: 0.9rem; color: #334155; }
     tr:hover { background: #fbfcfe; }
@@ -199,6 +199,25 @@ interface IncidentePunto {
     @media (max-width: 1100px) {
       .main-content { grid-template-columns: 1fr; }
       .map-panel { order: 2; }
+    }
+
+    @media (max-width: 768px) {
+      .dashboard-container { padding: 1rem; }
+      .page-header { flex-direction: column; align-items: stretch; gap: 1rem; }
+      .btn-refresh { width: 100%; justify-content: center; }
+      .stats-grid { grid-template-columns: 1fr; gap: 1rem; }
+      .stat-card { padding: 1rem; }
+      .panel-header { flex-wrap: wrap; gap: 0.75rem; }
+      .incident-card:hover { transform: none; }
+      .card-body header { flex-wrap: wrap; gap: 0.5rem; }
+      .incident-feed { max-height: none; }
+    }
+
+    @media (max-width: 480px) {
+      .stat-card { gap: 0.9rem; }
+      .stat-icon { width: 46px; height: 46px; font-size: 1.2rem; }
+      .stat-card .value { font-size: 1.5rem; }
+      th, td { padding: 0.85rem; }
     }
   `
 })
