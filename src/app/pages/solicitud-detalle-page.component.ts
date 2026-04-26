@@ -99,10 +99,27 @@ import { environment } from '../../environments/environment';
               <p class="subtle" *ngIf="solicitud.costo_estimado_min !== null && solicitud.costo_estimado_max !== null">
                 Rango esperado {{ formatBs(solicitud.costo_estimado_min) }} a {{ formatBs(solicitud.costo_estimado_max) }}
               </p>
+              <div class="visual-block" *ngIf="solicitud.visual_summary || (solicitud.visual_tags && solicitud.visual_tags.length)">
+                <span class="metric-pill visual-pill">Aporte de imágenes</span>
+                <p class="subtle" *ngIf="solicitud.visual_summary">{{ solicitud.visual_summary }}</p>
+                <p class="subtle" *ngIf="solicitud.visual_factor !== null && solicitud.visual_factor !== undefined">
+                  Factor visual aplicado {{ solicitud.visual_factor | number: '1.2-2' }}x
+                </p>
+                <p class="subtle" *ngIf="solicitud.visual_confidence !== null && solicitud.visual_confidence !== undefined">
+                  Confianza visual {{ (solicitud.visual_confidence * 100) | number: '1.0-0' }}%
+                </p>
+                <div class="tag-list" *ngIf="solicitud.visual_tags && solicitud.visual_tags.length">
+                  <span class="tag" *ngFor="let visualTag of solicitud.visual_tags">{{ visualTag }}</span>
+                </div>
+              </div>
               <p class="subtle" *ngIf="solicitud.costo_estimacion_nota">{{ solicitud.costo_estimacion_nota }}</p>
               <div class="alert-box estimate-warning" *ngIf="solicitud.costo_estimacion_confianza !== null && solicitud.costo_estimacion_confianza !== undefined && solicitud.costo_estimacion_confianza < 0.65">
                 <strong>Revisión manual sugerida</strong>
                 <p>La confianza de la estimación es baja para cierre automático.</p>
+              </div>
+              <div class="alert-box estimate-warning" *ngIf="solicitud.visual_confidence !== null && solicitud.visual_confidence !== undefined && solicitud.visual_confidence < 0.65">
+                <strong>Revisión manual sugerida</strong>
+                <p>La evidencia visual tiene baja confianza y debe validarse manualmente.</p>
               </div>
             </ng-container>
             <ng-template #noEstimate>
@@ -471,6 +488,8 @@ import { environment } from '../../environments/environment';
     .estimate-main { display: flex; align-items: baseline; gap: 0.5rem; margin-bottom: 0.5rem; }
     .estimate-main strong { font-size: 2rem; color: #4c1d95; }
     .subtle { color: #64748b; margin: 0.4rem 0 0; line-height: 1.5; }
+    .visual-block { margin-top: 0.6rem; padding: 0.75rem; border: 1px dashed #cbd5e1; border-radius: 12px; background: #f8fafc; }
+    .visual-pill { background: #e0e7ff; color: #3730a3; }
     .alert-box { background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 12px; padding: 0.8rem; }
     .alert-box p { margin: 0.35rem 0 0; }
     .estimate-warning { border-color: #fde68a; background: #fffbeb; margin-top: 0.75rem; }

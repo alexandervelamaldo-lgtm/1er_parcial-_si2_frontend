@@ -63,6 +63,10 @@ export interface Solicitud {
   costo_estimado_max?: number | null;
   costo_estimacion_confianza?: number | null;
   costo_estimacion_nota?: string | null;
+  visual_tags?: string[];
+  visual_summary?: string | null;
+  visual_factor?: number | null;
+  visual_confidence?: number | null;
   costo_final?: number | null;
   moneda_costo?: string;
   trabajo_terminado?: boolean;
