@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 
 import {
+  Evidencia,
   EstadoSolicitudOption,
   SolicitudCandidatos,
   SolicitudDetalle,
@@ -11,6 +12,7 @@ import {
 } from '../core/models/api.models';
 import { AuthService } from '../core/services/auth.service';
 import { EmergencyApiService } from '../core/services/emergency-api.service';
+import { environment } from '../../environments/environment';
 
 @Component({
   selector: 'app-solicitud-detalle-page',
@@ -91,10 +93,17 @@ import { EmergencyApiService } from '../core/services/emergency-api.service';
                 <strong>{{ formatBs(solicitud.costo_estimado) }}</strong>
                 <span>aproximado</span>
               </div>
+              <p class="subtle" *ngIf="solicitud.costo_estimacion_confianza !== null && solicitud.costo_estimacion_confianza !== undefined">
+                Confianza de estimación {{ (solicitud.costo_estimacion_confianza * 100) | number: '1.0-0' }}%
+              </p>
               <p class="subtle" *ngIf="solicitud.costo_estimado_min !== null && solicitud.costo_estimado_max !== null">
                 Rango esperado {{ formatBs(solicitud.costo_estimado_min) }} a {{ formatBs(solicitud.costo_estimado_max) }}
               </p>
               <p class="subtle" *ngIf="solicitud.costo_estimacion_nota">{{ solicitud.costo_estimacion_nota }}</p>
+              <div class="alert-box estimate-warning" *ngIf="solicitud.costo_estimacion_confianza !== null && solicitud.costo_estimacion_confianza !== undefined && solicitud.costo_estimacion_confianza < 0.65">
+                <strong>Revisión manual sugerida</strong>
+                <p>La confianza de la estimación es baja para cierre automático.</p>
+              </div>
             </ng-container>
             <ng-template #noEstimate>
               <p class="subtle">La estimación aún no está disponible para esta solicitud.</p>
@@ -136,16 +145,64 @@ import { EmergencyApiService } from '../core/services/emergency-api.service';
               <strong>Transcripción de audio</strong>
               <p>{{ solicitud.transcripcion_audio }}</p>
             </div>
+            <div class="alert-box audio-status pending" *ngIf="solicitud.transcripcion_audio_estado === 'PROCESANDO'">
+              <strong>Transcripción de audio en proceso</strong>
+              <p>Estamos procesando la nota de voz. Recarga la solicitud en unos segundos.</p>
+            </div>
+            <div class="alert-box audio-status error" *ngIf="solicitud.transcripcion_audio_estado === 'ERROR'">
+              <strong>No se pudo transcribir el audio</strong>
+              <p>{{ solicitud.transcripcion_audio_error || 'Error interno de transcripción.' }}</p>
+            </div>
           </article>
 
           <article class="glass-card" *ngIf="solicitud.evidencias.length">
             <div class="card-header">
               <h3>Evidencias</h3>
             </div>
-            <ul class="stack-list">
-              <li *ngFor="let ev of solicitud.evidencias">
-                <strong>{{ ev.tipo }}</strong>
-                <span>{{ ev.nombre_archivo || ev.contenido_texto || 'Archivo adjunto' }}</span>
+            <ul class="evidence-list">
+              <li class="evidence-row" *ngFor="let ev of solicitud.evidencias">
+                <div class="evidence-type">{{ ev.tipo }}</div>
+                <div class="evidence-body" [ngSwitch]="ev.tipo">
+                  <span *ngSwitchCase="'TEXT'">{{ ev.contenido_texto }}</span>
+
+                  <ng-container *ngSwitchCase="'IMAGE'">
+                    <div class="evidence-media">
+                      <button
+                        type="button"
+                        class="thumb-button"
+                        (click)="openEvidence(ev)"
+                        [disabled]="evidenceFailed(ev.id)"
+                        aria-label="Ver imagen adjunta"
+                      >
+                        <img
+                          class="thumb"
+                          [src]="buildEvidenceUrl(ev)"
+                          [alt]="ev.nombre_archivo || 'Evidencia'"
+                          (error)="markEvidenceError(ev.id)"
+                        />
+                      </button>
+                      <div class="evidence-actions">
+                        <strong>{{ ev.nombre_archivo || 'Imagen adjunta' }}</strong>
+                        <button type="button" class="btn-link" (click)="openEvidence(ev)" [disabled]="evidenceFailed(ev.id)">
+                          Ver completa
+                        </button>
+                        <a class="btn-link" [href]="buildEvidenceUrl(ev)" target="_blank" rel="noopener">Abrir</a>
+                        <span class="evidence-error" *ngIf="evidenceFailed(ev.id)">No se pudo cargar la imagen.</span>
+                      </div>
+                    </div>
+                  </ng-container>
+
+                  <ng-container *ngSwitchCase="'AUDIO'">
+                    <div class="evidence-actions">
+                      <strong>{{ ev.nombre_archivo || 'Audio adjunto' }}</strong>
+                      <a class="btn-link" [href]="buildEvidenceUrl(ev)" target="_blank" rel="noopener">Descargar / reproducir</a>
+                    </div>
+                  </ng-container>
+
+                  <ng-container *ngSwitchDefault>
+                    <span>{{ ev.nombre_archivo || ev.contenido_texto || 'Archivo adjunto' }}</span>
+                  </ng-container>
+                </div>
               </li>
             </ul>
           </article>
@@ -369,6 +426,19 @@ import { EmergencyApiService } from '../core/services/emergency-api.service';
         </aside>
       </div>
     </section>
+
+    <div class="modal-overlay" *ngIf="selectedEvidence() as selected" (click)="closeEvidence()">
+      <div class="modal-card" (click)="$event.stopPropagation()">
+        <div class="modal-header">
+          <div class="modal-title">{{ selected.nombre_archivo || 'Evidencia' }}</div>
+          <button type="button" class="btn-ghost" (click)="closeEvidence()">Cerrar</button>
+        </div>
+        <img class="modal-image" [src]="buildEvidenceUrl(selected)" [alt]="selected.nombre_archivo || 'Evidencia'" />
+        <div class="modal-buttons">
+          <a class="btn-ghost" [href]="buildEvidenceUrl(selected)" target="_blank" rel="noopener">Abrir</a>
+        </div>
+      </div>
+    </div>
   `,
   styles: `
     :host { --primary: #2563eb; --success: #15803d; --danger: #b91c1c; --dark: #0f172a; --bg: #f1f5f9; }
@@ -403,8 +473,30 @@ import { EmergencyApiService } from '../core/services/emergency-api.service';
     .subtle { color: #64748b; margin: 0.4rem 0 0; line-height: 1.5; }
     .alert-box { background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 12px; padding: 0.8rem; }
     .alert-box p { margin: 0.35rem 0 0; }
+    .estimate-warning { border-color: #fde68a; background: #fffbeb; margin-top: 0.75rem; }
+    .audio-status.pending { border-color: #fde68a; background: #fffbeb; }
+    .audio-status.error { border-color: #fecaca; background: #fef2f2; }
     .stack-list { display: grid; gap: 0.8rem; }
     .stack-list li, .candidate-card, .payment-item, .payment-summary { display: grid; gap: 0.25rem; }
+    .evidence-list { display: grid; gap: 0.9rem; margin: 0; padding: 0; list-style: none; }
+    .evidence-row { display: grid; grid-template-columns: 90px 1fr; gap: 0.9rem; align-items: start; }
+    .evidence-type { font-weight: 800; color: #0f172a; letter-spacing: 0.03em; }
+    .evidence-body { color: #334155; line-height: 1.5; }
+    .evidence-media { display: flex; gap: 0.9rem; flex-wrap: wrap; align-items: flex-start; }
+    .thumb-button { border: none; background: transparent; padding: 0; cursor: pointer; }
+    .thumb-button[disabled] { cursor: default; opacity: 0.6; }
+    .thumb { width: 140px; height: 96px; object-fit: cover; border-radius: 12px; border: 1px solid #e2e8f0; background: #f8fafc; }
+    .evidence-actions { display: flex; flex-direction: column; gap: 0.35rem; }
+    .btn-link { border: none; background: transparent; padding: 0; color: var(--primary); font-weight: 800; cursor: pointer; text-align: left; }
+    .btn-link[disabled] { cursor: default; opacity: 0.6; }
+    .evidence-error { color: #b91c1c; font-weight: 700; }
+    .modal-overlay { position: fixed; inset: 0; background: rgba(15, 23, 42, 0.72); display: grid; place-items: center; padding: 1.25rem; z-index: 10000; }
+    .modal-card { width: min(980px, 100%); max-height: calc(100vh - 2.5rem); overflow: auto; background: white; border-radius: 18px; border: 1px solid #e2e8f0; padding: 1rem; box-shadow: 0 18px 56px rgba(15, 23, 42, 0.25); }
+    .modal-header { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 0.9rem; }
+    .modal-title { font-weight: 900; color: #0f172a; }
+    .modal-image { width: 100%; height: auto; border-radius: 14px; border: 1px solid #e2e8f0; background: #f8fafc; }
+    .modal-buttons { display: flex; justify-content: flex-end; gap: 0.75rem; margin-top: 0.85rem; }
+    .btn-ghost { border: 1px solid #cbd5e1; background: transparent; border-radius: 12px; padding: 0.65rem 0.9rem; font-weight: 800; cursor: pointer; color: #0f172a; text-decoration: none; display: inline-flex; align-items: center; justify-content: center; }
     .payment-main { display: flex; justify-content: space-between; align-items: center; }
     .timeline { position: relative; padding-left: 1.25rem; border-left: 2px solid #e2e8f0; }
     .timeline-event { position: relative; margin-bottom: 1rem; }
@@ -468,8 +560,10 @@ export class SolicitudDetallePageComponent {
   readonly seguimiento = signal<SolicitudSeguimiento | null>(null);
   readonly candidatos = signal<SolicitudCandidatos | null>(null);
   readonly estados = signal<EstadoSolicitudOption[]>([]);
+  readonly selectedEvidence = signal<Evidencia | null>(null);
   readonly roleNames = computed(() => this.authService.currentRoles());
   readonly canAssign = computed(() => this.roleNames().some((role) => ['ADMINISTRADOR', 'OPERADOR'].includes(role)));
+  private readonly evidenceErrorById = signal<Record<number, boolean>>({});
 
   selectedWorkshopId: number | null = null;
   selectedTechnicianId: number | null = null;
@@ -533,11 +627,51 @@ export class SolicitudDetallePageComponent {
     return 'Sin respuesta';
   }
 
+  openEvidence(ev: Evidencia) {
+    if (ev.tipo !== 'IMAGE') {
+      return;
+    }
+    if (this.evidenceFailed(ev.id)) {
+      return;
+    }
+    this.selectedEvidence.set(ev);
+  }
+
+  closeEvidence() {
+    this.selectedEvidence.set(null);
+  }
+
+  markEvidenceError(evidenceId: number) {
+    const current = this.evidenceErrorById();
+    if (current[evidenceId]) {
+      return;
+    }
+    this.evidenceErrorById.set({ ...current, [evidenceId]: true });
+  }
+
+  evidenceFailed(evidenceId: number) {
+    return Boolean(this.evidenceErrorById()[evidenceId]);
+  }
+
+  buildEvidenceUrl(ev: Evidencia) {
+    const base = environment.apiUrl.replace(/\/$/, '');
+    const rawPath = ev.url || `/solicitudes/evidencias/${ev.id}/archivo`;
+    const path = rawPath.startsWith('/') ? rawPath : `/${rawPath}`;
+    let url = `${base}${path}`;
+    const token = this.authService.getToken();
+    if (token) {
+      url = `${url}?access_token=${encodeURIComponent(token)}`;
+    }
+    return url;
+  }
+
   showAiBlock(): boolean {
     const current = this.solicitud();
     return Boolean(
       current?.resumen_ia ||
       current?.transcripcion_audio ||
+      current?.transcripcion_audio_estado ||
+      current?.transcripcion_audio_error ||
       current?.motivo_prioridad ||
       current?.etiquetas_ia ||
       current?.requiere_revision_manual

@@ -54,6 +54,9 @@ export interface Solicitud {
   resumen_ia?: string | null;
   etiquetas_ia?: string | null;
   transcripcion_audio?: string | null;
+  transcripcion_audio_estado?: 'PROCESANDO' | 'COMPLETADA' | 'ERROR' | null;
+  transcripcion_audio_error?: string | null;
+  transcripcion_audio_actualizada_en?: string | null;
   proveedor_ia?: string | null;
   costo_estimado?: number | null;
   costo_estimado_min?: number | null;
@@ -180,6 +183,7 @@ export interface Evidencia {
   nombre_archivo?: string | null;
   contenido_texto?: string | null;
   archivo_url?: string | null;
+  url?: string | null;
   mime_type?: string | null;
   tamano_bytes?: number | null;
   fecha_creacion: string;
