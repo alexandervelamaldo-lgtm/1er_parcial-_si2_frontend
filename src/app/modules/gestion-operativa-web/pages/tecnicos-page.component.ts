@@ -1,8 +1,8 @@
 import { CommonModule } from '@angular/common';
 import { Component, computed, inject, signal, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { EmergencyApiService } from '../core/services/emergency-api.service';
-import { Taller, Tecnico, TecnicoCreatePayload } from '../core/models/api.models';
+import { EmergencyApiService } from '../../../core/services/gestion-solicitudes/emergency-api.service';
+import { Taller, Tecnico, TecnicoCreatePayload } from '../../../core/models/gestion-solicitudes/api.models';
 
 @Component({
   selector: 'app-tecnicos-page',
@@ -349,3 +349,5 @@ export class TecnicosPageComponent implements OnInit {
 }
 
 export {};
+
+

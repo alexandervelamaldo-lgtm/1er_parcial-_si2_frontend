@@ -1,8 +1,8 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { EmergencyApiService } from '../core/services/emergency-api.service';
-import { Taller, Tecnico, TrabajoRealizadoItem, TrabajoRealizadoResumen } from '../core/models/api.models';
+import { EmergencyApiService } from '../../../core/services/gestion-solicitudes/emergency-api.service';
+import { Taller, Tecnico, TrabajoRealizadoItem, TrabajoRealizadoResumen } from '../../../core/models/gestion-solicitudes/api.models';
 
 @Component({
   selector: 'app-trabajos-page',
@@ -227,4 +227,6 @@ export class TrabajosPageComponent implements OnInit {
     return `Bs ${safeAmount.toLocaleString('es-BO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   }
 }
+
+
 

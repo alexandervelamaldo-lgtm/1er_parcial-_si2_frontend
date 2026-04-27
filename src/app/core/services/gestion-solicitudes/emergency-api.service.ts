@@ -1,8 +1,8 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 
-import { environment } from '../../../environments/environment';
-import { AuthService } from './auth.service';
+import { environment } from '../../../../environments/environment';
+import { AuthService } from '../autenticacion-acceso/auth.service';
 import {
   Cliente,
   ClienteCreatePayload,
@@ -20,7 +20,7 @@ import {
   TecnicoCreatePayload,
   TrabajoFinalizadoPayload,
   TrabajoRealizadoListResponse
-} from '../models/api.models';
+} from '../../models/gestion-solicitudes/api.models';
 
 
 @Injectable({ providedIn: 'root' })
@@ -266,3 +266,4 @@ export class EmergencyApiService {
     });
   }
 }
+

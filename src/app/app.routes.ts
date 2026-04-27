@@ -2,16 +2,16 @@ import { Routes } from '@angular/router';
 
 import { authGuard } from './core/guards/auth.guard';
 import { roleGuard } from './core/guards/role.guard';
-import { ClientesPageComponent } from './pages/clientes-page.component';
-import { DashboardPageComponent } from './pages/dashboard-page.component';
-import { HistorialPageComponent } from './pages/historial-page.component';
-import { LoginPageComponent } from './pages/login-page.component';
-import { NotificacionesPageComponent } from './pages/notificaciones-page.component';
-import { PerfilPageComponent } from './pages/perfil-page.component';
-import { SolicitudDetallePageComponent } from './pages/solicitud-detalle-page.component';
-import { SolicitudesPageComponent } from './pages/solicitudes-page.component';
-import { TecnicosPageComponent } from './pages/tecnicos-page.component';
-import { TrabajosPageComponent } from './pages/trabajos-page.component';
+import { LoginPageComponent } from './modules/autenticacion-acceso/pages/login-page.component';
+import { DashboardPageComponent } from './modules/gestion-solicitudes/pages/dashboard-page.component';
+import { SolicitudDetallePageComponent } from './modules/inteligencia-automatizacion/pages/solicitud-detalle-page.component';
+import { SolicitudesPageComponent } from './modules/gestion-solicitudes/pages/solicitudes-page.component';
+import { HistorialPageComponent } from './modules/seguimiento-cliente-web/pages/historial-page.component';
+import { ClientesPageComponent } from './modules/gestion-operativa-web/pages/clientes-page.component';
+import { NotificacionesPageComponent } from './modules/gestion-operativa-web/pages/notificaciones-page.component';
+import { PerfilPageComponent } from './modules/gestion-operativa-web/pages/perfil-page.component';
+import { TecnicosPageComponent } from './modules/gestion-operativa-web/pages/tecnicos-page.component';
+import { TrabajosPageComponent } from './modules/pagos-facturacion/pages/trabajos-page.component';
 
 export const routes: Routes = [
   {
@@ -39,3 +39,4 @@ export const routes: Routes = [
     redirectTo: ''
   }
 ];
+

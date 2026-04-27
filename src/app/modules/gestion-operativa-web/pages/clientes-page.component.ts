@@ -1,8 +1,8 @@
 import { CommonModule } from '@angular/common';
 import { Component, inject, signal, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { EmergencyApiService } from '../core/services/emergency-api.service';
-import { Cliente, ClienteCreatePayload } from '../core/models/api.models';
+import { EmergencyApiService } from '../../../core/services/gestion-solicitudes/emergency-api.service';
+import { Cliente, ClienteCreatePayload } from '../../../core/models/gestion-solicitudes/api.models';
 
 @Component({
   selector: 'app-clientes-page',
@@ -409,3 +409,5 @@ export class ClientesPageComponent implements OnInit {
 }
 
 export {};
+
+

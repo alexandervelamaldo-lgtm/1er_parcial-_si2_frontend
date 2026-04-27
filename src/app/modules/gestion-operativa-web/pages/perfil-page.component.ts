@@ -1,6 +1,6 @@
 import { CommonModule } from '@angular/common';
 import { Component, computed, inject } from '@angular/core';
-import { AuthService } from '../core/services/auth.service';
+import { AuthService } from '../../../core/services/autenticacion-acceso/auth.service';
 
 @Component({
   selector: 'app-perfil-page',
@@ -161,3 +161,5 @@ export class PerfilPageComponent {
 }
 
 export {};
+
+

@@ -3,7 +3,7 @@ import { Component, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 
-import { AuthService } from '../core/services/auth.service';
+import { AuthService } from '../../../core/services/autenticacion-acceso/auth.service';
 
 @Component({
   selector: 'app-login-page',
@@ -237,3 +237,5 @@ export class LoginPageComponent {
     return 'Credenciales incorrectas o error de conexión.';
   }
 }
+
+

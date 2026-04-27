@@ -3,9 +3,9 @@ import { Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 
-import { EmergencyApiService } from '../core/services/emergency-api.service';
-import { AuthService } from '../core/services/auth.service';
-import { EstadoSolicitudOption, Solicitud, Tecnico } from '../core/models/api.models';
+import { EmergencyApiService } from '../../../core/services/gestion-solicitudes/emergency-api.service';
+import { AuthService } from '../../../core/services/autenticacion-acceso/auth.service';
+import { EstadoSolicitudOption, Solicitud, Tecnico } from '../../../core/models/gestion-solicitudes/api.models';
 
 @Component({
   selector: 'app-solicitudes-page',
@@ -237,3 +237,5 @@ export class SolicitudesPageComponent {
     return validTransitions[currentState] === targetState;
   }
 }
+
+

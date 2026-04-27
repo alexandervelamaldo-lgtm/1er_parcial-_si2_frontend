@@ -1,7 +1,7 @@
 import { CommonModule, DatePipe } from '@angular/common';
 import { Component, inject, signal, OnInit, computed } from '@angular/core';
-import { Notificacion } from '../core/models/api.models';
-import { EmergencyApiService } from '../core/services/emergency-api.service';
+import { Notificacion } from '../../../core/models/gestion-solicitudes/api.models';
+import { EmergencyApiService } from '../../../core/services/gestion-solicitudes/emergency-api.service';
 
 @Component({
   selector: 'app-notificaciones-page',
@@ -176,3 +176,5 @@ export class NotificacionesPageComponent implements OnInit {
 }
 
 export {};
+
+

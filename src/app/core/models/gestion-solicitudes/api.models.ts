@@ -317,3 +317,4 @@ export interface TecnicoCreatePayload {
   longitud_actual?: number | null;
   disponibilidad?: boolean;
 }
+

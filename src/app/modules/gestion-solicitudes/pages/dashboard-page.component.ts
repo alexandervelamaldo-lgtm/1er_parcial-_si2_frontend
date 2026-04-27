@@ -1,7 +1,7 @@
 import { CommonModule, DatePipe } from '@angular/common';
 import { Component, computed, inject, signal, OnInit } from '@angular/core';
-import { EmergencyApiService } from '../core/services/emergency-api.service';
-import { Solicitud } from '../core/models/api.models';
+import { EmergencyApiService } from '../../../core/services/gestion-solicitudes/emergency-api.service';
+import { Solicitud } from '../../../core/models/gestion-solicitudes/api.models';
 
 // Definimos una interfaz para el mapa para evitar el uso de Record genérico
 interface IncidentePunto {
@@ -255,3 +255,5 @@ export class DashboardPageComponent implements OnInit {
 }
 
 export {};
+
+

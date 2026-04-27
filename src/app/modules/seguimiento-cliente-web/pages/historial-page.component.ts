@@ -1,8 +1,8 @@
 import { CommonModule, DatePipe } from '@angular/common';
 import { Component, inject, signal } from '@angular/core';
 
-import { EmergencyApiService } from '../core/services/emergency-api.service';
-import { Notificacion, Solicitud } from '../core/models/api.models';
+import { EmergencyApiService } from '../../../core/services/gestion-solicitudes/emergency-api.service';
+import { Notificacion, Solicitud } from '../../../core/models/gestion-solicitudes/api.models';
 
 
 @Component({
@@ -51,3 +51,5 @@ export class HistorialPageComponent {
     this.api.getNotificaciones().subscribe((data) => this.notificaciones.set(data.slice(0, 10)));
   }
 }
+
+

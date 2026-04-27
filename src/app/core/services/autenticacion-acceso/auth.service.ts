@@ -3,8 +3,8 @@ import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Router } from '@angular/router';
 import { Observable, catchError, of, switchMap, tap, throwError } from 'rxjs';
 
-import { CurrentUserProfile, LoginResponse } from '../models/api.models';
-import { environment } from '../../../environments/environment';
+import { CurrentUserProfile, LoginResponse } from '../../models/gestion-solicitudes/api.models';
+import { environment } from '../../../../environments/environment';
 
 
 @Injectable({ providedIn: 'root' })
@@ -117,3 +117,4 @@ export class AuthService {
     return profile?.user.roles.some((role) => role.name === 'CLIENTE') ?? false;
   }
 }
+

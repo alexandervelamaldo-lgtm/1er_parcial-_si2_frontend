@@ -1,7 +1,7 @@
 <div class="shell" *ngIf="isAuthenticated(); else authView">
   <aside class="sidebar">
     <div>
-      <span class="brand-tag">Panel del taller</span>
+      <span class="brand-tag">Panel Web</span>
       <h1>Emergency SI2</h1>
       <p>Centro de coordinación de incidentes vehiculares.</p>
       <div class="user-card" *ngIf="profile() as profile">
@@ -11,9 +11,14 @@
     </div>
 
     <nav>
-      <a *ngFor="let item of visibleNavigation()" [routerLink]="item.path" routerLinkActive="active">
-        {{ item.label }}
-      </a>
+      <section class="menu-section" *ngFor="let section of visibleNavigationSections()">
+        <h2>{{ section.title }}</h2>
+        <small class="package-name">{{ section.packageName }}</small>
+        <a *ngFor="let item of section.items" [routerLink]="item.path" routerLinkActive="active">
+          {{ item.label }}
+        </a>
+        <p class="context-hint" *ngIf="section.contextualHint">{{ section.contextualHint }}</p>
+      </section>
     </nav>
 
     <button class="logout" type="button" (click)="logout()">Cerrar sesión</button>

@@ -9,10 +9,10 @@ import {
   SolicitudCandidatos,
   SolicitudDetalle,
   SolicitudSeguimiento
-} from '../core/models/api.models';
-import { AuthService } from '../core/services/auth.service';
-import { EmergencyApiService } from '../core/services/emergency-api.service';
-import { environment } from '../../environments/environment';
+} from '../../../core/models/gestion-solicitudes/api.models';
+import { AuthService } from '../../../core/services/autenticacion-acceso/auth.service';
+import { EmergencyApiService } from '../../../core/services/gestion-solicitudes/emergency-api.service';
+import { environment } from '../../../../environments/environment';
 
 @Component({
   selector: 'app-solicitud-detalle-page',
@@ -869,3 +869,5 @@ export class SolicitudDetallePageComponent {
 }
 
 export {};
+
+
