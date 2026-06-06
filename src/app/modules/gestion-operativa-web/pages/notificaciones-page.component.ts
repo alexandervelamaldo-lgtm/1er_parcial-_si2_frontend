@@ -1,12 +1,14 @@
 import { CommonModule, DatePipe } from '@angular/common';
-import { Component, inject, signal, OnInit, computed } from '@angular/core';
+import { Component, computed, effect, inject, signal, OnDestroy, OnInit } from '@angular/core';
 import { Notificacion } from '../../../core/models/gestion-solicitudes/api.models';
 import { EmergencyApiService } from '../../../core/services/gestion-solicitudes/emergency-api.service';
+import { TrackingService } from '../../../core/services/tracking/tracking.service';
+import { AppIconComponent } from '../../../shared/components/app-icon/app-icon.component';
 
 @Component({
   selector: 'app-notificaciones-page',
   standalone: true,
-  imports: [CommonModule, DatePipe],
+  imports: [CommonModule, DatePipe, AppIconComponent],
   template: `
     <section class="management-container">
       <header class="page-header">
@@ -19,7 +21,7 @@ import { EmergencyApiService } from '../../../core/services/gestion-solicitudes/
             {{ pendientes() }} pendientes
           </div>
           <button (click)="loadData()" class="btn-refresh" [disabled]="isLoading()">
-            <span class="icon" [class.spinning]="isLoading()">🔄</span>
+            <span class="icon" [class.spinning]="isLoading()" aria-hidden="true"><app-icon name="refresh" [size]="16" /></span>
             Sincronizar
           </button>
         </div>
@@ -27,7 +29,7 @@ import { EmergencyApiService } from '../../../core/services/gestion-solicitudes/
 
       <div class="notifications-feed">
         <div *ngIf="notificaciones().length === 0 && !isLoading()" class="empty-state">
-          <div class="empty-icon">🔔</div>
+          <div class="empty-icon" aria-hidden="true"><app-icon name="bell" [size]="36" /></div>
           <p>No tienes notificaciones por el momento.</p>
         </div>
 
@@ -60,7 +62,7 @@ import { EmergencyApiService } from '../../../core/services/gestion-solicitudes/
               class="btn-mark"
               title="Marcar como leída"
             >
-              ✓
+              <app-icon name="check" [size]="16" />
             </button>
           </div>
         </article>
@@ -122,11 +124,12 @@ import { EmergencyApiService } from '../../../core/services/gestion-solicitudes/
 
     /* Utils */
     .btn-refresh { display: flex; align-items: center; gap: 0.5rem; padding: 0.6rem 1rem; border: 1.5px solid #e2e8f0; background: white; border-radius: 12px; font-weight: 600; cursor: pointer; }
+    .icon { display: inline-flex; align-items: center; justify-content: center; }
     .spinning { animation: spin 1s linear infinite; display: inline-block; }
     @keyframes spin { to { transform: rotate(360deg); } }
 
     .empty-state { text-align: center; padding: 5rem 1rem; color: var(--gray); }
-    .empty-icon { font-size: 3rem; margin-bottom: 1rem; opacity: 0.3; }
+    .empty-icon { margin-bottom: 1rem; opacity: 0.35; display: inline-flex; align-items: center; justify-content: center; }
 
     @media (max-width: 900px) {
       .management-container { padding: 1rem; }
@@ -144,9 +147,12 @@ import { EmergencyApiService } from '../../../core/services/gestion-solicitudes/
     }
   `
 })
-export class NotificacionesPageComponent implements OnInit {
+export class NotificacionesPageComponent implements OnInit, OnDestroy {
   private readonly api = inject(EmergencyApiService);
-  
+  private readonly tracking = inject(TrackingService);
+  private reloadTimer: number | null = null;
+  private reloadQueuedWhileLoading = false;
+
   readonly notificaciones = signal<Notificacion[]>([]);
   readonly isLoading = signal(false);
 
@@ -155,8 +161,25 @@ export class NotificacionesPageComponent implements OnInit {
     this.notificaciones().filter(n => !n.leida).length
   );
 
+  constructor() {
+    effect(() => {
+      const notificationVersion = this.tracking.notificationRefreshVersion();
+      if (notificationVersion === 0) return;
+      this.scheduleReload();
+    });
+  }
+
   ngOnInit() {
     this.loadData();
+    this.tracking.connect();
+  }
+
+  ngOnDestroy() {
+    if (this.reloadTimer) {
+      window.clearTimeout(this.reloadTimer);
+      this.reloadTimer = null;
+    }
+    this.tracking.disconnect();
   }
 
   loadData() {
@@ -165,16 +188,43 @@ export class NotificacionesPageComponent implements OnInit {
       next: (data) => {
         this.notificaciones.set(data);
         this.isLoading.set(false);
+        if (this.reloadQueuedWhileLoading) {
+          this.reloadQueuedWhileLoading = false;
+          this.scheduleReload();
+        }
       },
-      error: () => this.isLoading.set(false)
+      error: () => {
+        this.isLoading.set(false);
+        if (this.reloadQueuedWhileLoading) {
+          this.reloadQueuedWhileLoading = false;
+          this.scheduleReload();
+        }
+      }
     });
   }
 
   markAsRead(id: number) {
     this.api.marcarNotificacionLeida(id).subscribe(() => this.loadData());
   }
+
+  private scheduleReload() {
+    if (this.isLoading()) {
+      this.reloadQueuedWhileLoading = true;
+      return;
+    }
+    if (this.reloadTimer) {
+      window.clearTimeout(this.reloadTimer);
+    }
+    this.reloadTimer = window.setTimeout(() => {
+      this.reloadTimer = null;
+      if (this.isLoading()) {
+        this.reloadQueuedWhileLoading = true;
+        return;
+      }
+      this.loadData();
+    }, 250);
+  }
 }
 
 export {};
-
 

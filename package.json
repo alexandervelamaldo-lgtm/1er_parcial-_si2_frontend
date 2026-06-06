@@ -5,6 +5,7 @@
     "ng": "ng",
     "start": "ng serve --proxy-config proxy.conf.json",
     "build": "ng build",
+    "build:render": "node ./scripts/write-render-env.mjs && ng build --configuration render",
     "watch": "ng build --watch --configuration development",
     "test": "ng test"
   },
@@ -28,8 +29,13 @@
     "@angular/forms": "^20.3.0",
     "@angular/platform-browser": "^20.3.0",
     "@angular/router": "^20.3.0",
+    "@angular/service-worker": "20.3.18",
+    "firebase": "^10.14.1",
+    "jspdf": "^3.0.3",
+    "mapbox-gl": "^3.14.0",
     "rxjs": "~7.8.0",
     "tslib": "^2.3.0",
+    "xlsx": "^0.18.5",
     "zone.js": "~0.15.0"
   },
   "devDependencies": {

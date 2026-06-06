@@ -1,13 +1,16 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { EmergencyApiService } from '../../../core/services/gestion-solicitudes/emergency-api.service';
 import { Taller, Tecnico, TrabajoRealizadoItem, TrabajoRealizadoResumen } from '../../../core/models/gestion-solicitudes/api.models';
+import { EmergencyReportRow } from '../../../core/services/reportes/sample-emergencies';
+import { VoiceReportComponent } from '../../../shared/components/voice-report/voice-report.component';
+import { TxtFileToolsComponent } from '../../../shared/components/txt-file-tools/txt-file-tools.component';
 
 @Component({
   selector: 'app-trabajos-page',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, VoiceReportComponent, TxtFileToolsComponent],
   template: `
     <div class="management-container">
       <header class="page-header">
@@ -22,6 +25,9 @@ import { Taller, Tecnico, TrabajoRealizadoItem, TrabajoRealizadoResumen } from '
         </div>
       </header>
 
+      <app-voice-report [rows]="voiceReportRows()" reportName="Trabajos realizados" />
+      <app-txt-file-tools />
+
       <section class="filters glass-panel">
         <div class="filters-grid">
           <label>
@@ -33,7 +39,7 @@ import { Taller, Tecnico, TrabajoRealizadoItem, TrabajoRealizadoResumen } from '
             <input type="date" [(ngModel)]="hasta" />
           </label>
           <label>
-            Técnico
+            Taller
             <select [(ngModel)]="tecnicoId">
               <option [ngValue]="null">Todos</option>
               <option *ngFor="let tecnico of tecnicos()" [ngValue]="tecnico.id">{{ tecnico.nombre }}</option>
@@ -85,7 +91,7 @@ import { Taller, Tecnico, TrabajoRealizadoItem, TrabajoRealizadoResumen } from '
                 <th>Fecha</th>
                 <th>Cliente</th>
                 <th>Taller</th>
-                <th>Técnico</th>
+                <th>Taller</th>
                 <th>Incidente</th>
                 <th>Estimado IA</th>
                 <th>Costo final</th>
@@ -173,6 +179,15 @@ export class TrabajosPageComponent implements OnInit {
   readonly tecnicos = signal<Tecnico[]>([]);
   readonly talleres = signal<Taller[]>([]);
   readonly isLoading = signal(false);
+  readonly voiceReportRows = computed<EmergencyReportRow[]>(() =>
+    this.trabajos().map((item) => ({
+      fechaHora: item.fecha_cierre,
+      tipoIncidente: item.tipo_incidente,
+      unidadGrua: item.tecnico && item.tecnico !== 'Sin tecnico' ? item.tecnico : item.taller,
+      estadoServicio: `${item.estado_pago} / COMPLETADA`,
+      ubicacion: item.taller
+    }))
+  );
 
   desde = '';
   hasta = '';
@@ -227,6 +242,5 @@ export class TrabajosPageComponent implements OnInit {
     return `Bs ${safeAmount.toLocaleString('es-BO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   }
 }
-
 
 

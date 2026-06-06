@@ -22,6 +22,9 @@ export interface LoginResponse {
   access_token: string;
   token_type: string;
   user: UserProfile;
+  /** Tenant donde el backend encontró al usuario. El cliente debe
+   *  guardarlo y enviarlo como X-Tenant en requests subsiguientes. */
+  tenant_key?: string | null;
 }
 
 export interface Solicitud {
@@ -44,10 +47,23 @@ export interface Solicitud {
   es_carretera?: boolean;
   condicion_vehiculo?: string;
   nivel_riesgo?: number;
+  /// Cuántos talleres consecutivos rechazaron la propuesta del cliente.
+  /// Cuando llega a 3 el backend escala a operadores con notificación push.
+  /// Lo lee el dashboard del operador para mostrar el widget "Solicitudes escaladas".
+  taller_rechazos_consecutivos?: number;
   fecha_solicitud: string;
   fecha_asignacion?: string | null;
   fecha_atencion?: string | null;
   fecha_cierre?: string | null;
+  fecha_incidente?: string | null;
+  danos_descripcion?: string | null;
+  ubicacion_texto?: string | null;
+  categoria_dano?: string | null;
+  presupuesto_aceptado?: number | null;
+  ruta_osrm?: Record<string, any> | null;
+  ruta_distancia_km?: number | null;
+  ruta_eta_min?: number | null;
+  servicio_demanda?: ServicioDemanda | null;
   clasificacion_confianza?: number | null;
   requiere_revision_manual?: boolean;
   motivo_prioridad?: string | null;
@@ -119,6 +135,8 @@ export interface Tecnico {
   latitud_actual?: number | null;
   longitud_actual?: number | null;
   disponibilidad: boolean;
+  radio_cobertura_km?: number | null;
+  en_turno?: boolean;
   ubicacion_actualizada_en?: string | null;
 }
 
@@ -128,6 +146,11 @@ export interface TecnicoCandidato {
   telefono: string;
   especialidad: string;
   disponibilidad: boolean;
+  en_turno?: boolean;
+  radio_cobertura_km?: number | null;
+  match_especialidad?: boolean;
+  score?: number | null;
+  detalle_match?: string | null;
   distancia_km?: number | null;
   eta_min?: number | null;
 }
@@ -140,6 +163,14 @@ export interface Taller {
   latitud: number;
   longitud: number;
   telefono: string;
+  horarios?: string | null;
+  certificaciones?: string | null;
+  tarifas_base?: Record<string, any>;
+  descuentos_marca?: Record<string, number>;
+  marca_asociada?: string | null;
+  rating_promedio?: number;
+  rating_total?: number;
+  categoria?: CategoriaTaller | null;
   capacidad: number;
   servicios?: string[];
   disponible?: boolean;
@@ -150,24 +181,113 @@ export interface Taller {
   motivo_sugerencia?: string | null;
 }
 
+export interface TallerCreatePayload {
+  categoria_id: number;
+  nombre: string;
+  direccion: string;
+  latitud: number;
+  longitud: number;
+  telefono: string;
+  horarios?: string | null;
+  certificaciones?: string | null;
+  servicios?: string[];
+  capacidad: number;
+  disponible?: boolean;
+  acepta_automaticamente?: boolean;
+  marca_asociada?: string | null;
+  email?: string | null;
+  password?: string | null;
+}
+
+export interface CategoriaTaller {
+  id: number;
+  slug: string;
+  nombre: string;
+  descripcion?: string | null;
+}
+
+export interface TallerMapa extends Taller {
+  presupuesto_min?: number | null;
+  presupuesto_max?: number | null;
+  presupuesto_descuento_min?: number | null;
+  presupuesto_descuento_max?: number | null;
+  descuento_porcentaje_aplicado?: number | null;
+  tiempo_reparacion_horas?: number | null;
+}
+
 export interface SolicitudCandidatos {
   solicitud_id: number;
   hay_cobertura: boolean;
   mensaje?: string | null;
   talleres: Taller[];
   tecnicos: TecnicoCandidato[];
+  servicio_unico?: ServicioDemanda | null;
+}
+
+export interface TipoIncidenteOption {
+  id: number;
+  nombre: string;
+  descripcion: string;
+}
+
+export interface SolicitudCreatePayload {
+  cliente_id: number;
+  vehiculo_id: number;
+  taller_id?: number | null;
+  tipo_incidente_id: number;
+  latitud_incidente: number;
+  longitud_incidente: number;
+  latitud_cliente: number;
+  longitud_cliente: number;
+  descripcion: string;
+  danos_descripcion?: string | null;
+  fecha_incidente?: string | null;
+  ubicacion_texto?: string | null;
+  categoria_dano?: string | null;
+  foto_url?: string | null;
+  es_carretera?: boolean;
+  condicion_vehiculo?: string;
+  nivel_riesgo?: number;
+}
+
+export interface SolicitudSeleccionTallerPayload {
+  taller_id: number;
+  origen_lat: number;
+  origen_lon: number;
+  presupuesto_aceptado?: number | null;
+}
+
+export interface SolicitudActualizarRutaPayload {
+  origen_lat: number;
+  origen_lon: number;
 }
 
 export interface SolicitudSeguimiento {
   solicitud_id: number;
   estado: string;
+  route_color?: string | null;
+  servicio_id?: number | null;
+  servicio_estado?: string | null;
   taller_nombre?: string | null;
+  taller_id?: number | null;
+  latitud_taller?: number | null;
+  longitud_taller?: number | null;
   tecnico_id?: number | null;
   tecnico_nombre?: string | null;
+  latitud_cliente?: number | null;
+  longitud_cliente?: number | null;
+  latitud_servicio?: number | null;
+  longitud_servicio?: number | null;
+  direccion_servicio?: string | null;
   latitud_actual?: number | null;
   longitud_actual?: number | null;
   distancia_km?: number | null;
   eta_min?: number | null;
+  eta_min_lower?: number | null;
+  eta_min_upper?: number | null;
+  // Geometría GeoJSON (LineString) de la ruta vial taller→incidente cuando el
+  // seguimiento se origina en el taller (flujo "taller sin técnico").
+  ruta_seguimiento?: Record<string, any> | null;
   ubicacion_actualizada_en?: string | null;
   ubicacion_desactualizada?: boolean;
   tracking_activo?: boolean;
@@ -176,6 +296,10 @@ export interface SolicitudSeguimiento {
   cliente_aprobada?: boolean | null;
   propuesta_expira_en?: string | null;
   propuesta_expirada?: boolean;
+  match_especialidad?: boolean;
+  confirmacion_ubicacion_ok?: boolean | null;
+  distancia_confirmacion_m?: number | null;
+  confirmacion_ubicacion_en?: string | null;
   mensaje?: string | null;
 }
 
@@ -220,6 +344,10 @@ export interface PagoSolicitudPayload {
 export interface TrabajoFinalizadoPayload {
   costo_final: number;
   observacion: string;
+  // El técnico asignado confirma su GPS contra el punto del servicio.
+  // El taller sin técnico cierra desde el panel web y no comparte ubicación.
+  latitud_confirmacion?: number;
+  longitud_confirmacion?: number;
 }
 
 export interface TrabajoRealizadoItem {
@@ -306,6 +434,39 @@ export interface Notificacion {
   fecha_creacion: string;
 }
 
+export interface KpiZonaItem {
+  lat: number;
+  lng: number;
+  count: number;
+}
+
+export interface KpisResumen {
+  tiempo_asignacion_promedio_min: number | null;
+  tiempo_llegada_promedio_min: number | null;
+  incidentes_por_tipo: Record<string, number>;
+  zonas_top: KpiZonaItem[];
+  tasa_cancelacion: number;
+}
+
+export interface CotizacionItem {
+  concepto: string;
+  cantidad: number;
+  precio_unitario: number;
+}
+
+export interface Cotizacion {
+  id: number;
+  solicitud_id: number;
+  taller_id: number | null;
+  tecnico_id: number | null;
+  estado: string;
+  items: Array<Record<string, any>>;
+  total: number;
+  moneda: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface TecnicoCreatePayload {
   email: string;
   password: string;
@@ -316,5 +477,46 @@ export interface TecnicoCreatePayload {
   latitud_actual?: number | null;
   longitud_actual?: number | null;
   disponibilidad?: boolean;
+  radio_cobertura_km?: number | null;
+  en_turno?: boolean;
+}
+
+export interface ServicioDemanda {
+  id: number;
+  estado: string;
+  solicitud_id: number;
+  taller_id?: number | null;
+  tecnico_id?: number | null;
+  latitud_cliente: number;
+  longitud_cliente: number;
+  latitud_servicio: number;
+  longitud_servicio: number;
+  direccion_servicio?: string | null;
+  radio_busqueda_km: number;
+  cobertura_tecnico_km?: number | null;
+  distancia_asignacion_km?: number | null;
+  eta_estimado_min?: number | null;
+  score_matching?: number | null;
+  match_especialidad?: boolean;
+  detalle_matching?: string | null;
+  confirmacion_ubicacion_ok?: boolean | null;
+  distancia_confirmacion_m?: number | null;
+  confirmacion_ubicacion_en?: string | null;
+}
+
+export interface WebPushPublicKeyResponse {
+  publicKey: string;
+}
+
+export interface NotificationPreferences {
+  disabledAll: boolean;
+  disabledTypes: Record<string, boolean>;
+}
+
+export interface WebPushSubscriptionPayload {
+  endpoint: string;
+  keys: { p256dh: string; auth: string };
+  expirationTime?: string | null;
+  userAgent?: string | null;
 }
 

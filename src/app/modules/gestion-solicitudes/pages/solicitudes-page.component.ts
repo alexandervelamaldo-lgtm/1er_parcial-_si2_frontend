@@ -1,16 +1,18 @@
 import { CommonModule } from '@angular/common';
 import { Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { RouterLink } from '@angular/router';
+import { ActivatedRoute, RouterLink } from '@angular/router';
 
 import { EmergencyApiService } from '../../../core/services/gestion-solicitudes/emergency-api.service';
 import { AuthService } from '../../../core/services/autenticacion-acceso/auth.service';
-import { EstadoSolicitudOption, Solicitud, Tecnico } from '../../../core/models/gestion-solicitudes/api.models';
+import { EstadoSolicitudOption, Solicitud, Taller } from '../../../core/models/gestion-solicitudes/api.models';
+import { canProposeWorkshopAssignment } from '../../../core/utils/solicitud-assign';
+import { AppIconComponent } from '../../../shared/components/app-icon/app-icon.component';
 
 @Component({
   selector: 'app-solicitudes-page',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink],
+  imports: [CommonModule, FormsModule, RouterLink, AppIconComponent],
   template: `
     <section class="management-container">
       <header class="page-header">
@@ -19,14 +21,19 @@ import { EstadoSolicitudOption, Solicitud, Tecnico } from '../../../core/models/
           <p>Asignación de unidades y control de flujo de trabajo</p>
         </div>
         <button (click)="loadData()" class="btn-refresh" [disabled]="isLoading()">
-          <span class="icon" [class.spinning]="isLoading()">🔄</span>
+          <span class="icon" [class.spinning]="isLoading()" aria-hidden="true"><app-icon name="refresh" [size]="16" /></span>
           Sincronizar
         </button>
       </header>
 
       <div class="request-list">
+        <div class="access-notice" *ngIf="accessNotice() as notice">
+          <app-icon name="alert" [size]="18" />
+          <span>{{ notice }}</span>
+        </div>
+
         <div *ngIf="solicitudes().length === 0 && !isLoading()" class="empty-state">
-          <div class="empty-icon">📂</div>
+          <div class="empty-icon" aria-hidden="true"><app-icon name="folder" [size]="36" /></div>
           <p>No hay solicitudes pendientes de atención.</p>
         </div>
 
@@ -41,13 +48,26 @@ import { EstadoSolicitudOption, Solicitud, Tecnico } from '../../../core/models/
             </header>
             
             <p class="description">{{ solicitud.descripcion }}</p>
+
+            <!-- Diagnóstico IA: bloque etiquetado y prominente para que el
+                 operador sepa de un vistazo qué tipo de problema reporta el
+                 cliente, sin tener que abrir el detalle. Solo aparece si hay
+                 algún dato de diagnóstico (categoría / nivel / etiquetas /
+                 revisión manual). Resalta más fuerte en REGISTRADA porque ahí
+                 es donde el operador toma la decisión de a quién asignar. -->
+            <div class="ai-diagnostic"
+                 *ngIf="hasAiDiagnostic(solicitud)"
+                 [class.is-new]="solicitud.estado?.nombre === 'REGISTRADA'">
+              <span class="ai-label">Diagnóstico técnico</span>
+              <span class="ai-value">{{ aiDiagnosticSummary(solicitud) }}</span>
+            </div>
+
             <div class="secondary-tags">
-              <span class="mini-tag" *ngIf="solicitud.requiere_revision_manual">Revisión IA</span>
+              <span class="mini-tag" *ngIf="solicitud.requiere_revision_manual">Diagnóstico pendiente</span>
               <span class="mini-tag" *ngIf="solicitud.cliente_aprobada === false">Pendiente cliente</span>
               <span class="mini-tag success" *ngIf="solicitud.cliente_aprobada === true">Cliente aprobó</span>
               <span class="mini-tag warning" *ngIf="solicitud.costo_estimado">Estimado {{ formatBs(solicitud.costo_estimado) }}</span>
               <span class="mini-tag success" *ngIf="solicitud.trabajo_terminado && solicitud.costo_final">Trabajo hecho {{ formatBs(solicitud.costo_final) }}</span>
-              <span class="mini-tag" *ngIf="solicitud.etiquetas_ia">{{ solicitud.etiquetas_ia }}</span>
             </div>
             
             <footer class="metadata">
@@ -55,8 +75,9 @@ import { EstadoSolicitudOption, Solicitud, Tecnico } from '../../../core/models/
                 <span class="status-dot" [attr.data-status]="solicitud.estado?.nombre"></span>
                 Estado: <strong>{{ solicitud.estado?.nombre }}</strong>
               </span>
-              <span class="tech-assigned" *ngIf="solicitud.tecnico">
-                👤 Técnico: {{ solicitud.tecnico.nombre }}
+              <span class="tech-assigned" *ngIf="solicitud.taller_id || solicitud.tecnico">
+                <app-icon name="wrench" [size]="14" />
+                Taller: {{ tallerNombre(solicitud) }}<ng-container *ngIf="solicitud.tecnico"> · Téc: {{ solicitud.tecnico.nombre }}</ng-container>
               </span>
             </footer>
           </div>
@@ -66,11 +87,11 @@ import { EstadoSolicitudOption, Solicitud, Tecnico } from '../../../core/models/
               Ver Historial
             </a>
 
-            <div class="assign-zone" *ngIf="canAssign() && !solicitud.tecnico_id">
-              <select [(ngModel)]="selectedTechnicians[solicitud.id]" class="tech-select">
-                <option [ngValue]="undefined">Seleccionar Técnico...</option>
-                <option *ngFor="let tecnico of availableTechnicians()" [ngValue]="tecnico.id">
-                  {{ tecnico.nombre }} (Disponible)
+            <div class="assign-zone" *ngIf="canAssign() && canAssignSolicitud(solicitud)">
+              <select [(ngModel)]="selectedTalleres[solicitud.id]" class="tech-select">
+                <option [ngValue]="undefined">Seleccionar taller...</option>
+                <option *ngFor="let taller of availableTalleres()" [ngValue]="taller.id">
+                  {{ taller.nombre }}{{ taller.acepta_automaticamente ? ' (auto)' : '' }}
                 </option>
               </select>
               <button class="btn-assign" (click)="assign(solicitud.id)">Asignar Unidad</button>
@@ -100,6 +121,12 @@ import { EstadoSolicitudOption, Solicitud, Tecnico } from '../../../core/models/
 
     /* Listado */
     .request-list { display: grid; gap: 1.25rem; }
+    .access-notice {
+      display: flex; align-items: center; gap: 0.6rem;
+      padding: 0.85rem 1rem; border-radius: 12px;
+      background: #fff7ed; color: #9a3412; border: 1px solid #fdba74;
+      font-weight: 600;
+    }
 
     .request-card {
       display: grid;
@@ -131,6 +158,26 @@ import { EstadoSolicitudOption, Solicitud, Tecnico } from '../../../core/models/
     .mini-tag.success { background: #dcfce7; color: #166534; }
     .mini-tag.warning { background: #fef3c7; color: #92400e; }
 
+    /* Bloque de diagnóstico IA — labeled y visible para que el operador
+       sepa de un vistazo qué TIPO de problema reporta el cliente. Se realza
+       (border más fuerte) cuando la solicitud está REGISTRADA, porque ahí
+       es donde el operador decide a quién asignar. */
+    .ai-diagnostic {
+      display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap;
+      background: #eff6ff; border: 1px solid #dbeafe;
+      border-left: 3px solid #2563eb;
+      padding: 0.55rem 0.85rem; border-radius: 8px;
+      margin-bottom: 0.85rem; font-size: 0.88rem;
+    }
+    .ai-diagnostic.is-new { border-left-width: 5px; background: #dbeafe; }
+    .ai-label {
+      font-weight: 800; color: #1d4ed8;
+      text-transform: uppercase; font-size: 0.68rem; letter-spacing: 0.6px;
+      background: white; padding: 0.18rem 0.55rem; border-radius: 4px;
+      border: 1px solid #bfdbfe;
+    }
+    .ai-value { color: #1e3a8a; font-weight: 600; }
+
     .metadata { display: flex; gap: 1.5rem; font-size: 0.85rem; color: var(--gray); padding-top: 1rem; border-top: 1px solid #f8fafc; flex-wrap: wrap; }
     .status-indicator { display: flex; align-items: center; gap: 0.5rem; }
     .status-dot { width: 8px; height: 8px; border-radius: 50%; background: #cbd5e1; }
@@ -158,11 +205,13 @@ import { EstadoSolicitudOption, Solicitud, Tecnico } from '../../../core/models/
 
     /* Utils */
     .btn-refresh { display: flex; align-items: center; gap: 0.5rem; padding: 0.6rem 1rem; border: 1.5px solid #e2e8f0; background: white; border-radius: 10px; font-weight: 600; cursor: pointer; }
+    .icon { display: inline-flex; align-items: center; justify-content: center; }
     .spinning { animation: spin 1s linear infinite; display: inline-block; }
     @keyframes spin { to { transform: rotate(360deg); } }
 
     .empty-state { text-align: center; padding: 4rem; color: var(--gray); }
-    .empty-icon { font-size: 3rem; margin-bottom: 1rem; opacity: 0.5; }
+    .empty-icon { margin-bottom: 1rem; opacity: 0.45; display: inline-flex; align-items: center; justify-content: center; }
+    .tech-assigned { display: inline-flex; align-items: center; gap: 0.45rem; }
 
     @media (max-width: 900px) {
       .management-container { padding: 1rem; }
@@ -183,18 +232,26 @@ import { EstadoSolicitudOption, Solicitud, Tecnico } from '../../../core/models/
 export class SolicitudesPageComponent {
   private readonly api = inject(EmergencyApiService);
   private readonly authService = inject(AuthService);
+  private readonly route = inject(ActivatedRoute);
 
   readonly solicitudes = signal<Solicitud[]>([]);
-  readonly tecnicos = signal<Tecnico[]>([]);
+  readonly talleres = signal<Taller[]>([]);
   readonly estados = signal<EstadoSolicitudOption[]>([]);
   readonly isLoading = signal(false);
+  readonly accessNotice = signal<string | null>(null);
 
   readonly canAssign = computed(() => this.authService.hasAnyRole(['ADMINISTRADOR', 'OPERADOR']));
-  readonly availableTechnicians = computed(() => this.tecnicos().filter((t) => t.disponibilidad));
-  
-  selectedTechnicians: Record<number, number | undefined> = {};
+  // El operador propone un TALLER (no un técnico): el backend buscará un técnico
+  // disponible dentro de ese taller o seguirá el flujo SIN_TECNICO. /talleres ya
+  // filtra disponible=true en el servidor; reforzamos por si acaso.
+  readonly availableTalleres = computed(() => this.talleres().filter((t) => t.disponible !== false));
+
+  selectedTalleres: Record<number, number | undefined> = {};
 
   constructor() {
+    if (this.route.snapshot.queryParamMap.get('blocked') === 'request') {
+      this.accessNotice.set('No tienes permisos para ver la solicitud seleccionada.');
+    }
     this.loadData();
   }
 
@@ -205,14 +262,30 @@ export class SolicitudesPageComponent {
       this.solicitudes.set(data);
       this.isLoading.set(false);
     });
-    this.api.getTecnicos().subscribe((data) => this.tecnicos.set(data));
+    this.api.getTalleres().subscribe((data) => this.talleres.set(data));
     this.api.getEstadosSolicitud().subscribe((data) => this.estados.set(data));
   }
 
   assign(solicitudId: number) {
-    const tecnicoId = this.selectedTechnicians[solicitudId];
-    if (!tecnicoId) return;
-    this.api.asignarTecnico(solicitudId, tecnicoId).subscribe(() => this.loadData());
+    const tallerId = this.selectedTalleres[solicitudId];
+    if (!tallerId) return;
+    // Se envía solo el taller_id: el backend resuelve el técnico (o deja el
+    // servicio en SIN_TECNICO si el taller aún no tiene uno disponible).
+    this.api.asignarTecnico(solicitudId, null, tallerId).subscribe(() => this.loadData());
+  }
+
+  tallerNombre(solicitud: Solicitud): string {
+    const taller = this.talleres().find((t) => t.id === solicitud.taller_id);
+    return taller?.nombre ?? solicitud.tecnico?.nombre ?? `#${solicitud.taller_id ?? ''}`;
+  }
+
+  canAssignSolicitud(solicitud: Solicitud): boolean {
+    if (solicitud.tecnico_id) return false;
+    return canProposeWorkshopAssignment({
+      estadoNombre: solicitud.estado?.nombre,
+      tecnicoId: solicitud.tecnico_id ?? null,
+      clienteAprobada: solicitud.cliente_aprobada ?? null
+    });
   }
 
   changeStatusByName(solicitudId: number, estado: string, observacion: string) {
@@ -236,6 +309,89 @@ export class SolicitudesPageComponent {
 
     return validTransitions[currentState] === targetState;
   }
-}
 
+  // ── Diagnóstico IA: helpers para el bloque etiquetado del card ─────────
+  //
+  // El operador antes tenía que adivinar el tipo de problema desde un mini-tag
+  // de "etiquetas_ia" sin contexto. Ahora le mostramos un resumen ordenado:
+  // categoría · nivel de riesgo · etiquetas extra · marca de revisión manual.
+
+  hasAiDiagnostic(s: Solicitud): boolean {
+    return Boolean(
+      this.isEmptyTankRequest(s) ||
+      (s.categoria_dano && s.categoria_dano !== 'general') ||
+      s.etiquetas_ia ||
+      s.nivel_riesgo != null ||
+      s.requiere_revision_manual
+    );
+  }
+
+  aiDiagnosticSummary(s: Solicitud): string {
+    const parts: string[] = [];
+    if (this.isEmptyTankRequest(s)) {
+      parts.push('Tanque vacío');
+    } else if (s.categoria_dano && s.categoria_dano !== 'general') {
+      parts.push(this.categoryLabel(s.categoria_dano));
+    }
+    if (s.nivel_riesgo != null) {
+      parts.push(`riesgo ${this.riskLabel(s.nivel_riesgo)}`);
+    }
+    if (s.etiquetas_ia) {
+      parts.push(
+        String(s.etiquetas_ia)
+          .split('|')
+          .map((tag) => this.categoryLabel(tag))
+          .join(' · ')
+      );
+    }
+    if (s.requiere_revision_manual) {
+      parts.push('requiere diagnóstico manual');
+    }
+    return parts.length > 0 ? parts.join(' · ') : 'sin diagnóstico técnico';
+  }
+
+  private categoryLabel(cat: string): string {
+    const map: Record<string, string> = {
+      'llanta': 'Llantas',
+      'llantas': 'Llantas',
+      'motor': 'Motor',
+      'bateria': 'Batería',
+      'batería': 'Batería',
+      'choque': 'Carrocería / choque',
+      'electrico': 'Eléctrico',
+      'eléctrico': 'Eléctrico',
+      'combustible': 'Combustible',
+      'tanque_vacio': 'Tanque vacío',
+      'tanque vacío': 'Tanque vacío',
+      'tanque vacio': 'Tanque vacío',
+      'general': 'General'
+    };
+    return map[cat.toLowerCase()] ?? cat;
+  }
+
+  private isEmptyTankRequest(s: Solicitud): boolean {
+    const source = [
+      s.tipo_incidente?.nombre ?? '',
+      s.descripcion ?? '',
+      s.etiquetas_ia ?? '',
+      s.categoria_dano ?? ''
+    ]
+      .join(' ')
+      .toLowerCase();
+    return (
+      source.includes('tanque_vacio') ||
+      source.includes('tanque vacío') ||
+      source.includes('tanque vacio') ||
+      source.includes('sin combustible') ||
+      source.includes('sin gasolina') ||
+      source.includes('sin diesel')
+    );
+  }
+
+  private riskLabel(n: number): string {
+    if (n <= 1) return 'bajo';
+    if (n <= 3) return 'medio';
+    return 'alto';
+  }
+}
 

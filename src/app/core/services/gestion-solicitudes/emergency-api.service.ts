@@ -3,23 +3,38 @@ import { HttpClient, HttpHeaders } from '@angular/common/http';
 
 import { environment } from '../../../../environments/environment';
 import { AuthService } from '../autenticacion-acceso/auth.service';
+import { TenantService } from '../tenant/tenant.service';
 import {
+  CategoriaTaller,
   Cliente,
   ClienteCreatePayload,
+  Cotizacion,
+  CotizacionItem,
   CurrentUserProfile,
   EstadoSolicitudOption,
+  KpisResumen,
+  NotificationPreferences,
   Notificacion,
   Pago,
   PagoSolicitudPayload,
   Solicitud,
   SolicitudCandidatos,
+  SolicitudCreatePayload,
   SolicitudDetalle,
   SolicitudSeguimiento,
+  SolicitudSeleccionTallerPayload,
+  SolicitudActualizarRutaPayload,
   Taller,
+  TallerCreatePayload,
+  TallerMapa,
   Tecnico,
   TecnicoCreatePayload,
+  TipoIncidenteOption,
   TrabajoFinalizadoPayload,
-  TrabajoRealizadoListResponse
+  TrabajoRealizadoListResponse,
+  Vehiculo,
+  WebPushPublicKeyResponse,
+  WebPushSubscriptionPayload
 } from '../../models/gestion-solicitudes/api.models';
 
 
@@ -27,10 +42,16 @@ import {
 export class EmergencyApiService {
   private readonly http = inject(HttpClient);
   private readonly authService = inject(AuthService);
+  private readonly tenantService = inject(TenantService);
 
   private get headers(): HttpHeaders {
     const token = this.authService.getToken();
-    return new HttpHeaders(token ? { Authorization: `Bearer ${token}` } : {});
+    const tenant = this.tenantService.getTenant();
+    const headers: Record<string, string> = { 'X-Tenant': tenant };
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+    return new HttpHeaders(headers);
   }
 
   getSolicitudesActivas() {
@@ -53,6 +74,36 @@ export class EmergencyApiService {
 
   getSolicitudDetalle(solicitudId: number) {
     return this.http.get<SolicitudDetalle>(`${environment.apiUrl}/solicitudes/${solicitudId}/detalle`, {
+      headers: this.headers
+    });
+  }
+
+  createSolicitud(payload: SolicitudCreatePayload) {
+    return this.http.post<Solicitud>(`${environment.apiUrl}/solicitudes`, payload, {
+      headers: this.headers
+    });
+  }
+
+  getTiposIncidente() {
+    return this.http.get<TipoIncidenteOption[]>(`${environment.apiUrl}/solicitudes/tipos-incidente`, {
+      headers: this.headers
+    });
+  }
+
+  getVehiculos() {
+    return this.http.get<Vehiculo[]>(`${environment.apiUrl}/vehiculos`, {
+      headers: this.headers
+    });
+  }
+
+  seleccionarTallerSolicitud(solicitudId: number, payload: SolicitudSeleccionTallerPayload) {
+    return this.http.put<Solicitud>(`${environment.apiUrl}/solicitudes/${solicitudId}/seleccionar-taller`, payload, {
+      headers: this.headers
+    });
+  }
+
+  actualizarRutaSolicitud(solicitudId: number, payload: SolicitudActualizarRutaPayload) {
+    return this.http.put<Solicitud>(`${environment.apiUrl}/solicitudes/${solicitudId}/ruta`, payload, {
       headers: this.headers
     });
   }
@@ -208,9 +259,49 @@ export class EmergencyApiService {
     });
   }
 
+  createTaller(payload: TallerCreatePayload) {
+    return this.http.post<Taller>(`${environment.apiUrl}/talleres`, payload, {
+      headers: this.headers
+    });
+  }
+
+  updateTaller(tallerId: number, payload: Partial<TallerCreatePayload>) {
+    return this.http.put<Taller>(`${environment.apiUrl}/talleres/${tallerId}`, payload, {
+      headers: this.headers
+    });
+  }
+
   getTalleres() {
     return this.http.get<Taller[]>(`${environment.apiUrl}/talleres`, {
       headers: this.headers
+    });
+  }
+
+  getCategoriasTaller() {
+    return this.http.get<CategoriaTaller[]>(`${environment.apiUrl}/talleres/categorias`, {
+      headers: this.headers
+    });
+  }
+
+  getTalleresMapa(filters: {
+    categoria_id?: number | null;
+    dano_categoria?: string | null;
+    marca?: string | null;
+    lat?: number | null;
+    lon?: number | null;
+    radio?: number | null;
+  }) {
+    const params: Record<string, string> = {};
+    if (filters.categoria_id != null) params['categoria_id'] = String(filters.categoria_id);
+    if (filters.dano_categoria) params['dano_categoria'] = String(filters.dano_categoria);
+    if (filters.marca) params['marca'] = String(filters.marca);
+    if (filters.lat != null) params['lat'] = String(filters.lat);
+    if (filters.lon != null) params['lon'] = String(filters.lon);
+    if (filters.radio != null) params['radio'] = String(filters.radio);
+
+    return this.http.get<TallerMapa[]>(`${environment.apiUrl}/talleres/mapa`, {
+      headers: this.headers,
+      params
     });
   }
 
@@ -254,10 +345,85 @@ export class EmergencyApiService {
     );
   }
 
+  unregisterDeviceToken(token?: string | null) {
+    const params: Record<string, string> = {};
+    if (token) params['token'] = token;
+    return this.http.delete<void>(`${environment.apiUrl}/notificaciones/device-token`, {
+      headers: this.headers,
+      params
+    });
+  }
+
+  getWebPushPublicKey() {
+    return this.http.get<WebPushPublicKeyResponse>(`${environment.apiUrl}/notificaciones/webpush/public-key`, {
+      headers: this.headers
+    });
+  }
+
+  subscribeWebPush(payload: WebPushSubscriptionPayload) {
+    return this.http.post<void>(`${environment.apiUrl}/notificaciones/webpush/subscribe`, payload, {
+      headers: this.headers
+    });
+  }
+
+  unsubscribeWebPush() {
+    return this.http.delete<void>(`${environment.apiUrl}/notificaciones/webpush/unsubscribe`, {
+      headers: this.headers
+    });
+  }
+
+  getNotificationPreferences() {
+    return this.http.get<NotificationPreferences>(`${environment.apiUrl}/notificaciones/preferencias`, {
+      headers: this.headers
+    });
+  }
+
+  updateNotificationPreferences(payload: Partial<NotificationPreferences>) {
+    return this.http.put<NotificationPreferences>(`${environment.apiUrl}/notificaciones/preferencias`, payload, {
+      headers: this.headers
+    });
+  }
+
   getMapaSolicitudes() {
     return this.http.get<Array<Record<string, string | number>>>(`${environment.apiUrl}/mapa/solicitudes-activas`, {
       headers: this.headers
     });
+  }
+
+  getKpisResumen() {
+    return this.http.get<KpisResumen>(`${environment.apiUrl}/kpis/resumen`, {
+      headers: this.headers
+    });
+  }
+
+  seedDevData(confirm = 'RESET') {
+    return this.http.post<{ ok: boolean }>(`${environment.apiUrl}/dev/seed`, { confirm }, { headers: this.headers });
+  }
+
+  getCotizaciones() {
+    return this.http.get<Cotizacion[]>(`${environment.apiUrl}/cotizaciones`, {
+      headers: this.headers
+    });
+  }
+
+  getCotizacion(cotizacionId: number) {
+    return this.http.get<Cotizacion>(`${environment.apiUrl}/cotizaciones/${cotizacionId}`, {
+      headers: this.headers
+    });
+  }
+
+  upsertCotizacionForSolicitud(solicitudId: number, payload: { items: CotizacionItem[]; moneda?: string }) {
+    return this.http.put<Cotizacion>(`${environment.apiUrl}/cotizaciones/solicitudes/${solicitudId}`, payload, {
+      headers: this.headers
+    });
+  }
+
+  updateCotizacionEstado(cotizacionId: number, estado: string) {
+    return this.http.put<Cotizacion>(
+      `${environment.apiUrl}/cotizaciones/${cotizacionId}/estado`,
+      { estado },
+      { headers: this.headers }
+    );
   }
 
   getPerfilActual() {

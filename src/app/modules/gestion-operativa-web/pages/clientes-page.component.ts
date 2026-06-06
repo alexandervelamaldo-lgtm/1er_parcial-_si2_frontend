@@ -3,11 +3,12 @@ import { Component, inject, signal, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { EmergencyApiService } from '../../../core/services/gestion-solicitudes/emergency-api.service';
 import { Cliente, ClienteCreatePayload } from '../../../core/models/gestion-solicitudes/api.models';
+import { AppIconComponent } from '../../../shared/components/app-icon/app-icon.component';
 
 @Component({
   selector: 'app-clientes-page',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, AppIconComponent],
   template: `
     <section class="management-container">
       <header class="page-header">
@@ -20,11 +21,11 @@ import { Cliente, ClienteCreatePayload } from '../../../core/models/gestion-soli
             {{ showCreatePanel() ? 'Cerrar alta' : 'Nuevo cliente' }}
           </button>
           <div class="search-mock">
-            <span class="icon">🔍</span>
+            <span class="icon" aria-hidden="true"><app-icon name="search" [size]="16" /></span>
             <input type="text" placeholder="Buscar cliente..." disabled>
           </div>
           <button (click)="loadData()" class="btn-refresh" [disabled]="isLoading()">
-            <span class="icon" [class.spinning]="isLoading()">🔄</span>
+            <span class="icon" [class.spinning]="isLoading()" aria-hidden="true"><app-icon name="refresh" [size]="16" /></span>
           </button>
         </div>
       </header>
@@ -96,10 +97,10 @@ import { Cliente, ClienteCreatePayload } from '../../../core/models/gestion-soli
         <table class="modern-table">
           <thead>
             <tr>
-              <th><span class="th-content">👤 Cliente</span></th>
-              <th><span class="th-content">🔐 Acceso</span></th>
-              <th><span class="th-content">📞 Contacto</span></th>
-              <th><span class="th-content">🚗 Vehículo Inicial</span></th>
+              <th><span class="th-content"><app-icon name="user" [size]="14" /> Cliente</span></th>
+              <th><span class="th-content"><app-icon name="lock" [size]="14" /> Acceso</span></th>
+              <th><span class="th-content"><app-icon name="phone" [size]="14" /> Contacto</span></th>
+              <th><span class="th-content"><app-icon name="car" [size]="14" /> Vehículo Inicial</span></th>
               <th class="text-center"><span class="th-content">Acciones</span></th>
             </tr>
           </thead>
@@ -132,8 +133,12 @@ import { Cliente, ClienteCreatePayload } from '../../../core/models/gestion-soli
                 </ng-template>
               </td>
               <td class="text-center">
-                <button class="btn-icon">👁️</button>
-                <button class="btn-icon">✏️</button>
+                <button class="btn-icon" type="button" aria-label="Ver cliente">
+                  <app-icon name="eye" [size]="16" />
+                </button>
+                <button class="btn-icon" type="button" aria-label="Editar cliente">
+                  <app-icon name="edit" [size]="16" />
+                </button>
               </td>
             </tr>
 
@@ -166,6 +171,7 @@ import { Cliente, ClienteCreatePayload } from '../../../core/models/gestion-soli
       display: flex; align-items: center; gap: 0.5rem; background: white; 
       padding: 0.6rem 1rem; border-radius: 12px; border: 1.5px solid #e2e8f0; width: 250px;
     }
+    .icon { display: inline-flex; align-items: center; justify-content: center; color: #64748b; }
     .search-mock input { border: none; outline: none; font-size: 0.9rem; width: 100%; color: var(--gray); }
 
     .create-panel{
@@ -196,7 +202,7 @@ import { Cliente, ClienteCreatePayload } from '../../../core/models/gestion-soli
     .modern-table { width: 100%; border-collapse: collapse; text-align: left; }
     
     .modern-table thead { background: #f8fafc; border-bottom: 2px solid #f1f5f9; }
-    .th-content { display: block; padding: 1.2rem 1.5rem; font-size: 0.75rem; font-weight: 800; text-transform: uppercase; color: #64748b; letter-spacing: 0.05em; }
+    .th-content { display: inline-flex; align-items: center; gap: 0.45rem; padding: 1.2rem 1.5rem; font-size: 0.75rem; font-weight: 800; text-transform: uppercase; color: #64748b; letter-spacing: 0.05em; }
 
     .modern-table tbody tr { transition: background 0.2s; border-bottom: 1px solid #f1f5f9; }
     .modern-table tbody tr:hover { background: #fbfcfe; }
@@ -228,10 +234,10 @@ import { Cliente, ClienteCreatePayload } from '../../../core/models/gestion-soli
 
     .text-center { text-align: center; }
     .btn-icon { 
-      background: none; border: none; font-size: 1.1rem; cursor: pointer; padding: 0.5rem;
-      border-radius: 8px; transition: 0.2s; grayscale: 1; opacity: 0.6;
+      background: none; border: none; cursor: pointer; padding: 0.5rem;
+      border-radius: 8px; transition: 0.2s; opacity: 0.65; color: #475569;
     }
-    .btn-icon:hover { background: #f1f5f9; grayscale: 0; opacity: 1; }
+    .btn-icon:hover { background: #f1f5f9; opacity: 1; color: var(--primary); }
 
     /* Utils */
     .btn-refresh { 
