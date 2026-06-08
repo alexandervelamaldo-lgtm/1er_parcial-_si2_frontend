@@ -106,8 +106,37 @@ export class MapboxService {
     distanceKm: number;
     durationMin: number;
   }>(80);
+  private mapboxGlPromise: Promise<any> | null = null;
 
   constructor(private readonly config: MapboxConfigService) {}
+
+  async loadMapboxGl(): Promise<any> {
+    if (this.mapboxGlPromise) {
+      return this.mapboxGlPromise;
+    }
+
+    this.mapboxGlPromise = Promise.all([
+      import('mapbox-gl'),
+      import('mapbox-gl/dist/mapbox-gl-csp-worker.js?worker'),
+      this.getAccessToken()
+    ])
+      .then(([mod, workerModule, token]) => {
+        const mapboxgl = mod.default;
+        const workerClass = workerModule.default;
+
+        // Force an explicit worker implementation so Vite/Angular dev builds
+        // do not execute Mapbox's generated blob worker with missing helpers.
+        mapboxgl.workerClass = workerClass;
+        mapboxgl.accessToken = token;
+        return mapboxgl;
+      })
+      .catch((err) => {
+        this.mapboxGlPromise = null;
+        throw err;
+      });
+
+    return this.mapboxGlPromise;
+  }
 
   async getStyleUrl(): Promise<string> {
     const data = await this.config.getConfig();
