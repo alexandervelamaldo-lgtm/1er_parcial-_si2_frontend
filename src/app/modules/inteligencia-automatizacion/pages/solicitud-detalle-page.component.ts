@@ -1274,7 +1274,7 @@ export class SolicitudDetallePageComponent implements OnDestroy {
     const current = this.solicitud();
     const stateId = this.estados().find((item) => item.nombre === target)?.id;
     if (current && stateId && this.statusNote.trim().length >= 3) {
-      this.api.actualizarEstado(current.id, stateId, this.statusNote.trim()).subscribe(() => this.reload());
+      this.api.actualizarEstado(current.id, stateId, this.statusNote.trim(), target).subscribe(() => this.reload());
     }
   }
 
@@ -1310,7 +1310,7 @@ export class SolicitudDetallePageComponent implements OnDestroy {
     }
     this.simulating.set(true);
     this.feedback.set('Equipo del taller saliendo hacia el incidente…');
-    this.api.actualizarEstado(current.id, enCaminoId, 'Equipo en camino al incidente (despacho desde la web).').subscribe({
+    this.api.actualizarEstado(current.id, enCaminoId, 'Equipo en camino al incidente (despacho desde la web).', 'EN_CAMINO').subscribe({
       next: async () => {
         this.reloadTrackingOnly();
         try {
@@ -1318,7 +1318,7 @@ export class SolicitudDetallePageComponent implements OnDestroy {
         } catch {
           // Si la animación falla igual avanzamos el estado.
         }
-        this.api.actualizarEstado(current.id, enAtencionId, 'Equipo llegó al lugar del incidente.').subscribe({
+        this.api.actualizarEstado(current.id, enAtencionId, 'Equipo llegó al lugar del incidente.', 'EN_ATENCION').subscribe({
           next: () => {
             this.feedback.set('Equipo en atención en el lugar del incidente.');
             this.simulating.set(false);
