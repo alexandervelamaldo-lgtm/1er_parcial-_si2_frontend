@@ -127,10 +127,10 @@ export class EmergencyApiService {
     });
   }
 
-  actualizarEstado(solicitudId: number, estadoId: number, observacion: string) {
+  actualizarEstado(solicitudId: number, estadoId: number, observacion: string, estadoNombre?: string) {
     return this.http.put<Solicitud>(
       `${environment.apiUrl}/solicitudes/${solicitudId}/estado`,
-      { estado_id: estadoId, observacion },
+      { estado_id: estadoId, estado_nombre: estadoNombre, observacion },
       { headers: this.headers }
     );
   }
