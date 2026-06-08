@@ -165,11 +165,8 @@ export class ServicioTrackingMapComponent implements AfterViewInit, OnChanges, O
   private async initMap(): Promise<void> {
     const container = this.mapHost?.nativeElement;
     if (!container) return;
-    const mod = await import('mapbox-gl');
-    this.mapboxgl = mod.default;
-    const token = await this.mapbox.getAccessToken();
+    this.mapboxgl = await this.mapbox.loadMapboxGl();
     const styleUrl = await this.mapbox.getStyleUrl();
-    this.mapboxgl.accessToken = token;
     this.map = new this.mapboxgl.Map({
       container,
       style: styleUrl,
