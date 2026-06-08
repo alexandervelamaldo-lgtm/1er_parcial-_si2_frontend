@@ -1,5 +1,6 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
+import { tap } from 'rxjs/operators';
 
 import { environment } from '../../../../environments/environment';
 import { AuthService } from '../autenticacion-acceso/auth.service';
@@ -44,6 +45,29 @@ export class EmergencyApiService {
   private readonly authService = inject(AuthService);
   private readonly tenantService = inject(TenantService);
 
+  // #region debug-point C:solicitudes-api-report
+  private debugReport(hypothesisId: string, location: string, msg: string, data: Record<string, unknown>) {
+    const debugServerUrl =
+      typeof window !== 'undefined'
+        ? new URLSearchParams(window.location.search).get('debugServerUrl')?.trim() || null
+        : null;
+    if (!debugServerUrl || !/^https?:\/\//i.test(debugServerUrl)) return;
+    fetch(debugServerUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        sessionId: 'solicitudes-runtime-errors',
+        runId: 'pre-fix',
+        hypothesisId,
+        location,
+        msg: `[DEBUG] ${msg}`,
+        data,
+        ts: Date.now()
+      })
+    }).catch(() => undefined);
+  }
+  // #endregion
+
   private get headers(): HttpHeaders {
     const token = this.authService.getToken();
     const tenant = this.tenantService.getTenant();
@@ -61,10 +85,38 @@ export class EmergencyApiService {
         limit: String(options?.limit ?? 200)
       }
     });
+    // #region debug-point C:get-solicitudes-activas
+    this.debugReport('C', 'emergency-api.service.ts:getSolicitudesActivas', 'requesting active requests', {
+      apiUrl: `${environment.apiUrl}/solicitudes/activas`,
+      tenant: this.tenantService.getTenant(),
+      hasToken: Boolean(this.authService.getToken()),
+      offset: params.get('offset'),
+      limit: params.get('limit')
+    });
+    // #endregion
     return this.http.get<Solicitud[]>(`${environment.apiUrl}/solicitudes/activas`, {
       headers: this.headers,
       params
-    });
+    }).pipe(
+      tap({
+        next: (rows) => {
+          this.debugReport('C', 'emergency-api.service.ts:getSolicitudesActivas', 'active requests response received', {
+            count: Array.isArray(rows) ? rows.length : null,
+            tenant: this.tenantService.getTenant()
+          });
+        },
+        error: (err) => {
+          this.debugReport('C', 'emergency-api.service.ts:getSolicitudesActivas', 'active requests request failed', {
+            status: err?.status ?? null,
+            statusText: err?.statusText ?? null,
+            message: err?.message ?? null,
+            detail: err?.error?.detail ?? err?.error ?? null,
+            tenant: this.tenantService.getTenant(),
+            hasToken: Boolean(this.authService.getToken())
+          });
+        }
+      })
+    );
   }
 
   getSolicitudes(options?: { offset?: number; limit?: number }) {
