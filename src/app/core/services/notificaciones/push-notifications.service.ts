@@ -3,6 +3,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { Router } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 
+import { AuthService } from '../autenticacion-acceso/auth.service';
 import { EmergencyApiService } from '../gestion-solicitudes/emergency-api.service';
 
 
@@ -12,6 +13,7 @@ type PermissionStateLocal = 'granted' | 'denied' | 'default';
 @Injectable({ providedIn: 'root' })
 export class PushNotificationsService {
   private readonly api = inject(EmergencyApiService);
+  private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
 
   private readonly storagePermissionKey = 'push.permission.state';
@@ -37,7 +39,7 @@ export class PushNotificationsService {
   // #endregion
 
   constructor() {
-    if (this.getBrowserPermission() === 'granted') {
+    if (this.hasAuthenticatedSession() && this.getBrowserPermission() === 'granted') {
       void this.ensureSubscribed().catch(() => undefined);
     }
     window.addEventListener('online', this.handleOnline);
@@ -146,6 +148,9 @@ export class PushNotificationsService {
   }
 
   async ensureSubscribed(): Promise<void> {
+    if (!this.hasAuthenticatedSession()) {
+      return;
+    }
     const keyResponse = await firstValueFrom(this.api.getWebPushPublicKey());
     const currentVapidKey = keyResponse.publicKey;
     const registration = await navigator.serviceWorker.register('/push-sw.js');
@@ -245,17 +250,21 @@ export class PushNotificationsService {
   }
 
   private readonly handleOnline = () => {
-    if (this.getBrowserPermission() === 'granted') {
+    if (this.hasAuthenticatedSession() && this.getBrowserPermission() === 'granted') {
       void this.ensureSubscribed().catch(() => undefined);
     }
   };
 
   private readonly handleVisibilityChange = () => {
     if (document.visibilityState !== 'visible') return;
-    if (this.getBrowserPermission() === 'granted') {
+    if (this.hasAuthenticatedSession() && this.getBrowserPermission() === 'granted') {
       void this.ensureSubscribed().catch(() => undefined);
     }
   };
+
+  private hasAuthenticatedSession(): boolean {
+    return this.auth.isAuthenticated() && !!this.auth.getToken();
+  }
 
   private urlBase64ToUint8Array(base64String: string) {
     const padding = '='.repeat((4 - (base64String.length % 4)) % 4);

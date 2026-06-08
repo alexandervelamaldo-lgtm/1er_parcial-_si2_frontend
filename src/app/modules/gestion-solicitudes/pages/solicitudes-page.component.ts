@@ -394,4 +394,3 @@ export class SolicitudesPageComponent {
     return 'alto';
   }
 }
-
