@@ -283,9 +283,7 @@ export class TalleresMapaSelectorComponent implements AfterViewInit, OnChanges, 
   private async initMap(): Promise<void> {
     const container = this.mapHost?.nativeElement;
     if (!container) return;
-    const mod = await import('mapbox-gl');
-    this.mapboxgl = mod.default;
-    this.mapboxgl.accessToken = await this.mapbox.getAccessToken();
+    this.mapboxgl = await this.mapbox.loadMapboxGl();
     const styleUrl = await this.mapbox.getStyleUrl();
     container.innerHTML = '';
 
@@ -462,3 +460,4 @@ export class TalleresMapaSelectorComponent implements AfterViewInit, OnChanges, 
     this.routeMeta = null;
   }
 }
+
