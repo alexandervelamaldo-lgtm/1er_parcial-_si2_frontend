@@ -1,7 +1,7 @@
 export const environment = {
   production: true,
-  apiUrl: 'https://emergency-backend.onrender.com',
-  wsBaseUrl: 'https://emergency-backend.onrender.com',
+  apiUrl: 'https://emergency-backend-ea41.onrender.com',
+  wsBaseUrl: 'https://emergency-backend-ea41.onrender.com',
   firebase: {
     apiKey: 'AIzaSyDvKpkTJgcFVrzc_Rjfj44xmsfKpcA_0hE',
     authDomain: 'apk2doparcialsi2.firebaseapp.com',
