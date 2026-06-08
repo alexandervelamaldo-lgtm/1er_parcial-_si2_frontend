@@ -440,11 +440,37 @@ export interface KpiZonaItem {
   count: number;
 }
 
+export interface KpiPeriodoItem {
+  fecha: string;
+  total: number;
+  completados: number;
+  cancelados: number;
+}
+
+export interface KpiTallerItem {
+  taller_id: number;
+  taller_nombre: string;
+  total_solicitudes: number;
+  completados: number;
+  tiempo_atencion_promedio_min: number | null;
+  tasa_completados: number;
+}
+
 export interface KpisResumen {
   tiempo_asignacion_promedio_min: number | null;
   tiempo_llegada_promedio_min: number | null;
+  tiempo_atencion_promedio_min: number | null;
+  total_solicitudes: number;
+  solicitudes_activas: number;
+  solicitudes_completadas: number;
+  solicitudes_canceladas: number;
+  tasa_completados: number;
   incidentes_por_tipo: Record<string, number>;
   zonas_top: KpiZonaItem[];
+  solicitudes_por_dia: KpiPeriodoItem[];
+  talleres: KpiTallerItem[];
+  calculado_en: string;
+  cache_ttl_segundos: number;
   tasa_cancelacion: number;
 }
 
@@ -519,4 +545,3 @@ export interface WebPushSubscriptionPayload {
   expirationTime?: string | null;
   userAgent?: string | null;
 }
-
