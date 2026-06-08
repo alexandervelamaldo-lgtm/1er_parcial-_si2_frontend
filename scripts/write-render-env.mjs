@@ -1,7 +1,7 @@
 import { writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-const apiUrl = (process.env.RENDER_EXTERNAL_API_URL || 'https://emergency-backend.onrender.com').trim();
+const apiUrl = (process.env.RENDER_EXTERNAL_API_URL || 'https://emergency-backend-ea41.onrender.com').trim();
 const wsBaseUrl = (process.env.RENDER_EXTERNAL_WS_URL || apiUrl).trim();
 
 const target = resolve(process.cwd(), 'src/environments/environment.render.ts');
