@@ -1,5 +1,5 @@
 import { Injectable, inject } from '@angular/core';
-import { HttpClient, HttpHeaders } from '@angular/common/http';
+import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
 
 import { environment } from '../../../../environments/environment';
 import { AuthService } from '../autenticacion-acceso/auth.service';
@@ -390,9 +390,14 @@ export class EmergencyApiService {
     });
   }
 
-  getKpisResumen() {
+  getKpisResumen(desde?: string | null) {
+    let params = new HttpParams();
+    if (desde) {
+      params = params.set('desde', desde);
+    }
     return this.http.get<KpisResumen>(`${environment.apiUrl}/kpis/resumen`, {
-      headers: this.headers
+      headers: this.headers,
+      params
     });
   }
 
@@ -432,4 +437,5 @@ export class EmergencyApiService {
     });
   }
 }
+
 
