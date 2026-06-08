@@ -6,11 +6,30 @@ import { EmergencyApiService } from '../../../core/services/gestion-solicitudes/
 import { TrackingService } from '../../../core/services/tracking/tracking.service';
 import { KpisResumen, Solicitud, SolicitudSeguimiento, Taller } from '../../../core/models/gestion-solicitudes/api.models';
 import { environment } from '../../../../environments/environment';
-import { AppIconComponent } from '../../../shared/components/app-icon/app-icon.component';
+import { AppIconComponent, IconName } from '../../../shared/components/app-icon/app-icon.component';
 import { ActiveRoute, IncidentePunto, MapaPickerComponent, TallerPunto } from '../../../shared/components/mapa-picker/mapa-picker.component';
 
 const IN_ROUTE_STATES = ['EN_CAMINO', 'EN_ATENCION', 'ASIGNADA', 'ACEPTADA'];
 const MAX_ACTIVE_ROUTES = 5;
+const KPI_AUTO_REFRESH_MS = 15 * 60 * 1000;
+
+type KpiRange = 'today' | 'week' | 'month' | 'all';
+
+type KpiSummaryCard = {
+  label: string;
+  value: string;
+  meta: string;
+  icon: IconName;
+  tone: 'blue' | 'violet' | 'green' | 'red' | 'amber';
+};
+
+type KpiTrendModel = {
+  hasData: boolean;
+  totalPath: string;
+  completadosPath: string;
+  maxValue: number;
+  labels: Array<{ x: number; label: string }>;
+};
 
 @Component({
   selector: 'app-dashboard-page',
@@ -64,6 +83,106 @@ const MAX_ACTIVE_ROUTES = 5;
           <p *ngIf="errorMessage() as message">{{ message }}</p>
         </div>
       </header>
+
+      <section class="surface-card mobile-kpi-panel" *ngIf="kpis() as data">
+        <div class="mobile-kpi-head">
+          <div>
+            <span class="section-kicker">KPI Dashboard</span>
+            <h3><app-icon name="trending-up" [size]="16" /> Rendimiento operativo</h3>
+            <p>Replica el tablero KPI móvil con el mismo cálculo, filtro temporal y refresco en vivo por tenant.</p>
+          </div>
+
+          <div class="mobile-kpi-actions">
+            <div class="range-chip-group">
+              <button
+                *ngFor="let option of kpiRangeOptions"
+                type="button"
+                class="range-chip"
+                [class.active]="kpiRange() === option.value"
+                (click)="setKpiRange(option.value)"
+              >
+                {{ option.label }}
+              </button>
+            </div>
+
+            <div class="kpi-action-buttons">
+              <button type="button" class="btn-secondary" (click)="exportKpiCsv()" [disabled]="!kpis()">
+                <app-icon name="download" [size]="16" />
+                Exportar CSV
+              </button>
+              <button type="button" class="btn-secondary" (click)="loadData()" [disabled]="isLoading()">
+                <app-icon name="refresh" [size]="16" />
+                {{ isLoading() ? 'Actualizando…' : 'Actualizar KPI' }}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="mobile-kpi-grid">
+          <article class="mobile-kpi-card" [attr.data-tone]="card.tone" *ngFor="let card of kpiSummaryCards()">
+            <div class="mobile-kpi-icon"><app-icon [name]="card.icon" [size]="18" /></div>
+            <div class="mobile-kpi-copy">
+              <span class="mobile-kpi-label">{{ card.label }}</span>
+              <strong class="mobile-kpi-value">{{ card.value }}</strong>
+              <small class="mobile-kpi-meta">{{ card.meta }}</small>
+            </div>
+          </article>
+        </div>
+
+        <div class="mobile-kpi-content">
+          <article class="mobile-kpi-chart-card">
+            <div class="chart-head">
+              <h4>Incidentes por tipo</h4>
+              <span>{{ kpiIncidentItems().length }} categorías</span>
+            </div>
+            <div class="empty-block small" *ngIf="kpiIncidentItems().length === 0">
+              <span>Sin datos de incidentes en el rango seleccionado.</span>
+            </div>
+            <div class="kpi-bar-list" *ngIf="kpiIncidentItems().length > 0">
+              <div class="kpi-bar-row" *ngFor="let item of kpiIncidentItems()">
+                <div class="kpi-bar-topline">
+                  <strong>{{ item.label }}</strong>
+                  <span>{{ item.count }}</span>
+                </div>
+                <div class="kpi-bar-track">
+                  <div class="kpi-bar-fill" [style.width.%]="item.pct"></div>
+                </div>
+                <small>{{ item.pct | number:'1.0-1' }}%</small>
+              </div>
+            </div>
+          </article>
+
+          <article class="mobile-kpi-chart-card">
+            <div class="chart-head">
+              <h4>{{ kpiTrendTitle() }}</h4>
+              <div class="trend-legend">
+                <span><i class="dot total"></i>Total</span>
+                <span><i class="dot completados"></i>Completados</span>
+              </div>
+            </div>
+            <div class="empty-block small" *ngIf="!kpiTrend().hasData">
+              <span>Sin datos de tendencia para el rango seleccionado.</span>
+            </div>
+            <div class="kpi-trend-shell" *ngIf="kpiTrend().hasData">
+              <svg viewBox="0 0 640 220" preserveAspectRatio="none" class="kpi-trend-chart">
+                <line x1="32" y1="24" x2="32" y2="188" class="axis-line" />
+                <line x1="32" y1="188" x2="616" y2="188" class="axis-line" />
+                <path [attr.d]="kpiTrend().totalPath" class="trend-line total"></path>
+                <path [attr.d]="kpiTrend().completadosPath" class="trend-line completados"></path>
+              </svg>
+              <div class="trend-labels">
+                <span *ngFor="let label of kpiTrend().labels" [style.left.%]="label.x">{{ label.label }}</span>
+              </div>
+            </div>
+          </article>
+        </div>
+
+        <footer class="mobile-kpi-footer">
+          <span>Rango: {{ kpiRangeLabel() }}</span>
+          <span>Actualizado: {{ formatKpiTimestamp(data.calculado_en) }}</span>
+          <span>Cache servidor: {{ data.cache_ttl_segundos }}s</span>
+        </footer>
+      </section>
 
       <section class="stats-grid">
         <article class="stat-card">
@@ -404,6 +523,273 @@ const MAX_ACTIVE_ROUTES = 5;
     </section>
   `,
   styles: `
+    .mobile-kpi-panel {
+      display: grid;
+      gap: 18px;
+      padding: 20px;
+      margin-bottom: 24px;
+      border: 1px solid rgba(148, 163, 184, 0.18);
+      background:
+        radial-gradient(circle at top right, rgba(59, 130, 246, 0.08), transparent 26%),
+        linear-gradient(180deg, rgba(255,255,255,0.98), rgba(248,250,252,0.96));
+    }
+    .mobile-kpi-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      align-items: flex-start;
+    }
+    .mobile-kpi-head h3,
+    .chart-head h4 {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 0;
+      color: #0f172a;
+    }
+    .mobile-kpi-head p {
+      margin: 6px 0 0;
+      color: #64748b;
+      max-width: 760px;
+    }
+    .mobile-kpi-actions {
+      display: grid;
+      gap: 12px;
+      justify-items: end;
+    }
+    .range-chip-group,
+    .kpi-action-buttons {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      justify-content: flex-end;
+    }
+    .range-chip,
+    .btn-secondary {
+      border: 1px solid rgba(148, 163, 184, 0.28);
+      background: white;
+      color: #0f172a;
+      border-radius: 999px;
+      padding: 9px 14px;
+      font: inherit;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.18s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .range-chip.active,
+    .range-chip:hover,
+    .btn-secondary:hover {
+      border-color: rgba(37, 99, 235, 0.45);
+      background: rgba(37, 99, 235, 0.08);
+      color: #1d4ed8;
+    }
+    .range-chip:disabled,
+    .btn-secondary:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+    .mobile-kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+      gap: 12px;
+    }
+    .mobile-kpi-card {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      padding: 16px;
+      border-radius: 18px;
+      border: 1px solid rgba(148, 163, 184, 0.18);
+      background: rgba(255, 255, 255, 0.94);
+      min-height: 102px;
+      box-shadow: 0 10px 24px rgba(15, 23, 42, 0.05);
+    }
+    .mobile-kpi-icon {
+      width: 42px;
+      height: 42px;
+      border-radius: 14px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .mobile-kpi-card[data-tone='blue'] .mobile-kpi-icon {
+      background: rgba(59, 130, 246, 0.12);
+      color: #2563eb;
+    }
+    .mobile-kpi-card[data-tone='violet'] .mobile-kpi-icon {
+      background: rgba(168, 85, 247, 0.12);
+      color: #7c3aed;
+    }
+    .mobile-kpi-card[data-tone='green'] .mobile-kpi-icon {
+      background: rgba(34, 197, 94, 0.12);
+      color: #16a34a;
+    }
+    .mobile-kpi-card[data-tone='red'] .mobile-kpi-icon {
+      background: rgba(239, 68, 68, 0.12);
+      color: #dc2626;
+    }
+    .mobile-kpi-card[data-tone='amber'] .mobile-kpi-icon {
+      background: rgba(249, 115, 22, 0.12);
+      color: #ea580c;
+    }
+    .mobile-kpi-copy {
+      display: grid;
+      gap: 4px;
+    }
+    .mobile-kpi-label {
+      color: #64748b;
+      font-size: 0.9rem;
+      font-weight: 600;
+    }
+    .mobile-kpi-value {
+      color: #0f172a;
+      font-size: clamp(1.45rem, 1.1rem + 1vw, 2rem);
+      line-height: 1;
+    }
+    .mobile-kpi-meta {
+      color: #94a3b8;
+      font-size: 0.84rem;
+    }
+    .mobile-kpi-content {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 16px;
+    }
+    .mobile-kpi-chart-card {
+      border-radius: 18px;
+      background: rgba(255, 255, 255, 0.92);
+      border: 1px solid rgba(148, 163, 184, 0.16);
+      padding: 18px;
+      display: grid;
+      gap: 14px;
+      min-height: 280px;
+    }
+    .chart-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: flex-start;
+    }
+    .chart-head span {
+      color: #64748b;
+      font-size: 0.85rem;
+      font-weight: 600;
+    }
+    .kpi-bar-list {
+      display: grid;
+      gap: 12px;
+    }
+    .kpi-bar-row {
+      display: grid;
+      gap: 6px;
+    }
+    .kpi-bar-topline {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      color: #0f172a;
+    }
+    .kpi-bar-track {
+      width: 100%;
+      height: 10px;
+      border-radius: 999px;
+      background: rgba(148, 163, 184, 0.18);
+      overflow: hidden;
+    }
+    .kpi-bar-fill {
+      height: 100%;
+      border-radius: inherit;
+      background: linear-gradient(90deg, #2563eb, #7c3aed);
+    }
+    .kpi-trend-shell {
+      display: grid;
+      gap: 10px;
+    }
+    .kpi-trend-chart {
+      width: 100%;
+      height: 220px;
+      overflow: visible;
+    }
+    .axis-line {
+      stroke: rgba(148, 163, 184, 0.55);
+      stroke-width: 1.5;
+    }
+    .trend-line {
+      fill: none;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      stroke-width: 3;
+    }
+    .trend-line.total { stroke: #2563eb; }
+    .trend-line.completados { stroke: #16a34a; stroke-dasharray: 8 6; }
+    .trend-labels {
+      position: relative;
+      min-height: 18px;
+      font-size: 0.78rem;
+      color: #64748b;
+    }
+    .trend-labels span {
+      position: absolute;
+      transform: translateX(-50%);
+      white-space: nowrap;
+    }
+    .trend-legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      color: #64748b;
+      font-size: 0.82rem;
+      font-weight: 600;
+    }
+    .trend-legend span {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .trend-legend .dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 999px;
+      display: inline-block;
+    }
+    .trend-legend .dot.total { background: #2563eb; }
+    .trend-legend .dot.completados { background: #16a34a; }
+    .mobile-kpi-footer {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px 18px;
+      color: #64748b;
+      font-size: 0.84rem;
+      border-top: 1px solid rgba(148, 163, 184, 0.16);
+      padding-top: 12px;
+    }
+    @media (max-width: 920px) {
+      .mobile-kpi-head {
+        grid-template-columns: 1fr;
+        display: grid;
+      }
+      .mobile-kpi-actions,
+      .range-chip-group,
+      .kpi-action-buttons {
+        justify-items: start;
+        justify-content: flex-start;
+      }
+    }
+    @media (max-width: 640px) {
+      .mobile-kpi-panel {
+        padding: 16px;
+      }
+      .mobile-kpi-grid {
+        grid-template-columns: 1fr;
+      }
+      .mobile-kpi-content {
+        grid-template-columns: 1fr;
+      }
+    }
     /* Monitoring widgets (Fase 6 — operador modo observador) ─────────── */
     .monitoring-card { border-left: 4px solid #f59e0b; }
     .monitoring-card .section-heading .subtle { color: #64748b; font-size: 0.85rem; margin-top: 4px; }
@@ -444,6 +830,7 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
   private readonly router = inject(Router);
   private readonly tracking = inject(TrackingService);
   private realtimeReloadTimer: number | null = null;
+  private kpiAutoRefreshTimer: number | null = null;
   private reloadQueuedWhileLoading = false;
 
   readonly isDev = !environment.production;
@@ -454,6 +841,123 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
   readonly errorMessage = signal<string | null>(null);
   readonly tecnicos = computed(() => this.tracking.tecnicos());
   readonly kpis = signal<KpisResumen | null>(null);
+  readonly kpiRange = signal<KpiRange>('month');
+  readonly kpiRangeOptions = [
+    { value: 'today' as const, label: 'Hoy' },
+    { value: 'week' as const, label: '7 días' },
+    { value: 'month' as const, label: '30 días' },
+    { value: 'all' as const, label: 'Todo' }
+  ];
+  readonly kpiSummaryCards = computed<KpiSummaryCard[]>(() => {
+    const kpis = this.kpis();
+    if (!kpis) return [];
+    return [
+      {
+        label: 'Total',
+        value: String(kpis.total_solicitudes ?? 0),
+        meta: 'Solicitudes registradas',
+        icon: 'signal',
+        tone: 'blue'
+      },
+      {
+        label: 'Activas',
+        value: String(kpis.solicitudes_activas ?? 0),
+        meta: 'Base operativa actual',
+        icon: 'clock',
+        tone: 'violet'
+      },
+      {
+        label: 'Completadas',
+        value: String(kpis.solicitudes_completadas ?? 0),
+        meta: this.formatKpiPct(kpis.tasa_completados ?? 0),
+        icon: 'check',
+        tone: 'green'
+      },
+      {
+        label: 'Canceladas',
+        value: String(kpis.solicitudes_canceladas ?? 0),
+        meta: this.formatKpiPct(kpis.tasa_cancelacion ?? 0),
+        icon: 'alert',
+        tone: 'red'
+      },
+      {
+        label: 'T. asignación',
+        value: this.formatKpiMin(kpis.tiempo_asignacion_promedio_min),
+        meta: 'Pendiente a asignada',
+        icon: 'clock',
+        tone: 'blue'
+      },
+      {
+        label: 'T. llegada',
+        value: this.formatKpiMin(kpis.tiempo_llegada_promedio_min),
+        meta: 'Asignada a atención',
+        icon: 'car',
+        tone: 'amber'
+      },
+      {
+        label: 'T. atención',
+        value: this.formatKpiMin(kpis.tiempo_atencion_promedio_min),
+        meta: 'Atención a cierre',
+        icon: 'wrench',
+        tone: 'green'
+      },
+      {
+        label: 'Talleres top',
+        value: String(kpis.talleres?.length ?? 0),
+        meta: 'Con actividad en el rango',
+        icon: 'trending-up',
+        tone: 'violet'
+      }
+    ];
+  });
+  readonly kpiIncidentItems = computed(() => {
+    const source = this.kpis()?.incidentes_por_tipo ?? {};
+    const entries = Object.entries(source)
+      .map(([label, count]) => ({ label, count }))
+      .sort((left, right) => right.count - left.count);
+    const max = entries[0]?.count ?? 0;
+    return entries.map((item) => ({
+      ...item,
+      pct: max > 0 ? (item.count / max) * 100 : 0
+    }));
+  });
+  readonly kpiTrend = computed<KpiTrendModel>(() => {
+    const series = this.kpis()?.solicitudes_por_dia ?? [];
+    if (series.length === 0) {
+      return { hasData: false, totalPath: '', completadosPath: '', maxValue: 0, labels: [] };
+    }
+    const width = 640;
+    const height = 220;
+    const left = 32;
+    const right = 24;
+    const top = 24;
+    const bottom = 32;
+    const plotWidth = width - left - right;
+    const plotHeight = height - top - bottom;
+    const maxValue = Math.max(1, ...series.map((item) => Math.max(item.total ?? 0, item.completados ?? 0)));
+    const xFor = (index: number) =>
+      left + (series.length === 1 ? plotWidth / 2 : (index / Math.max(1, series.length - 1)) * plotWidth);
+    const yFor = (value: number) => top + plotHeight - (value / maxValue) * plotHeight;
+    const buildPath = (selector: (item: KpisResumen['solicitudes_por_dia'][number]) => number) =>
+      series
+        .map((item, index) => `${index === 0 ? 'M' : 'L'} ${xFor(index).toFixed(1)} ${yFor(selector(item) ?? 0).toFixed(1)}`)
+        .join(' ');
+    const step = Math.max(1, Math.floor((series.length - 1) / 4));
+    const labels = series
+      .map((item, index) => ({ item, index }))
+      .filter(({ index }) => index === 0 || index === series.length - 1 || index % step === 0)
+      .map(({ item, index }) => ({
+        x: ((xFor(index) - left) / plotWidth) * 100,
+        label: item.fecha?.length >= 10 ? item.fecha.substring(5) : item.fecha
+      }));
+    return {
+      hasData: true,
+      totalPath: buildPath((item) => item.total ?? 0),
+      completadosPath: buildPath((item) => item.completados ?? 0),
+      maxValue,
+      labels
+    };
+  });
   readonly talleresMapa = computed<TallerPunto[]>(() =>
     this.talleres()
       .filter((item) => item.disponible !== false)
@@ -580,6 +1084,7 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
 
   ngOnInit() {
     this.loadData();
+    this.startKpiAutoRefresh();
     this.tracking.connect();
   }
 
@@ -588,6 +1093,10 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
       window.clearTimeout(this.realtimeReloadTimer);
       this.realtimeReloadTimer = null;
     }
+    if (this.kpiAutoRefreshTimer) {
+      window.clearInterval(this.kpiAutoRefreshTimer);
+      this.kpiAutoRefreshTimer = null;
+    }
     this.tracking.disconnect();
   }
 
@@ -595,6 +1104,7 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
     this.isLoading.set(true);
     this.errorMessage.set(null);
     const errors: string[] = [];
+    const kpiDesde = this.buildDateQuery();
 
     forkJoin({
       solicitudes: this.api.getSolicitudesActivas().pipe(
@@ -615,7 +1125,7 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
           return of([] as Taller[]);
         })
       ),
-      kpis: this.api.getKpisResumen().pipe(
+      kpis: this.api.getKpisResumen(kpiDesde).pipe(
         catchError((err) => {
           errors.push(this.formatError('KPIs', err));
           return of(null);
@@ -643,6 +1153,117 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
       });
   }
 
+  setKpiRange(range: KpiRange) {
+    if (this.kpiRange() === range) return;
+    this.kpiRange.set(range);
+    this.loadData();
+  }
+
+  kpiTrendTitle() {
+    switch (this.kpiRange()) {
+      case 'today':
+        return 'Tendencia de hoy';
+      case 'week':
+        return 'Tendencia diaria (7 dias)';
+      case 'month':
+        return 'Tendencia diaria (30 dias)';
+      case 'all':
+      default:
+        return 'Tendencia historica';
+    }
+  }
+
+  kpiRangeLabel() {
+    switch (this.kpiRange()) {
+      case 'today':
+        return 'Hoy';
+      case 'week':
+        return 'Ultimos 7 dias';
+      case 'month':
+        return 'Ultimos 30 dias';
+      case 'all':
+      default:
+        return 'Todo el historico';
+    }
+  }
+
+  formatKpiMin(value: number | null | undefined) {
+    return value == null ? '--' : `${value.toFixed(1)} min`;
+  }
+
+  formatKpiPct(value: number | null | undefined) {
+    return `${((value ?? 0) * 100).toFixed(1)}%`;
+  }
+
+  formatKpiTimestamp(value: string | null | undefined) {
+    if (!value) return '--';
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return value;
+    return parsed.toLocaleString('es-ES', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  }
+
+  exportKpiCsv() {
+    const data = this.kpis();
+    if (!data) return;
+    const csvRow = (...values: unknown[]) => values.map((value) => this.escapeCsvValue(value)).join(',');
+
+    const rows: string[] = [
+      csvRow('KPI Dashboard', this.formatKpiTimestamp(data.calculado_en)),
+      csvRow('Rango', this.kpiRangeLabel()),
+      '',
+      csvRow('Metrica', 'Valor'),
+      csvRow('Total solicitudes', data.total_solicitudes),
+      csvRow('Solicitudes activas', data.solicitudes_activas),
+      csvRow('Solicitudes completadas', data.solicitudes_completadas),
+      csvRow('Solicitudes canceladas', data.solicitudes_canceladas),
+      csvRow('Tasa completados', this.formatKpiPct(data.tasa_completados)),
+      csvRow('Tasa cancelacion', this.formatKpiPct(data.tasa_cancelacion)),
+      csvRow('Tiempo asignacion promedio', this.formatKpiMin(data.tiempo_asignacion_promedio_min)),
+      csvRow('Tiempo llegada promedio', this.formatKpiMin(data.tiempo_llegada_promedio_min)),
+      csvRow('Tiempo atencion promedio', this.formatKpiMin(data.tiempo_atencion_promedio_min)),
+      '',
+      csvRow('Incidentes por tipo', 'Total'),
+      ...Object.entries(data.incidentes_por_tipo ?? {}).map(([label, count]) =>
+        csvRow(label, count)
+      ),
+      '',
+      csvRow('Solicitudes por dia'),
+      csvRow('Fecha', 'Total', 'Completados', 'Cancelados'),
+      ...(data.solicitudes_por_dia ?? []).map((item) =>
+        csvRow(item.fecha, item.total, item.completados, item.cancelados)
+      ),
+      '',
+      csvRow('Talleres'),
+      csvRow('Taller ID', 'Nombre', 'Total solicitudes', 'Completados', 'Tasa completados', 'T. atencion prom.'),
+      ...(data.talleres ?? []).map((item) =>
+        csvRow(
+          item.taller_id,
+          item.taller_nombre,
+          item.total_solicitudes,
+          item.completados,
+          this.formatKpiPct(item.tasa_completados),
+          this.formatKpiMin(item.tiempo_atencion_promedio_min),
+        )
+      ),
+    ];
+
+    const blob = new Blob([rows.join('\n')], { type: 'text/csv;charset=utf-8;' });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `kpi-dashboard-${this.kpiRange()}-${Date.now()}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+  }
+
   private scheduleRealtimeReload() {
     if (this.isLoading()) {
       this.reloadQueuedWhileLoading = true;
@@ -661,6 +1282,16 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
       }
       this.loadData();
     }, 250);
+  }
+
+  private startKpiAutoRefresh() {
+    if (this.kpiAutoRefreshTimer) {
+      window.clearInterval(this.kpiAutoRefreshTimer);
+    }
+    this.kpiAutoRefreshTimer = window.setInterval(() => {
+      if (document.hidden || this.isLoading()) return;
+      this.loadData();
+    }, KPI_AUTO_REFRESH_MS);
   }
 
   /// Loads SolicitudSeguimiento for every in-route solicitud (limited to
@@ -778,6 +1409,29 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
 
   private normalizeState(state: string | null | undefined) {
     return String(state || '').trim().toUpperCase();
+  }
+
+  private buildDateQuery() {
+    const now = new Date();
+    switch (this.kpiRange()) {
+      case 'today':
+        return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())).toISOString();
+      case 'week':
+        return new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
+      case 'month':
+        return new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString();
+      case 'all':
+      default:
+        return null;
+    }
+  }
+
+  private escapeCsvValue(value: unknown) {
+    const normalized = String(value ?? '');
+    if (!/[",\n]/.test(normalized)) {
+      return normalized;
+    }
+    return `"${normalized.replace(/"/g, '""')}"`;
   }
 }
 
