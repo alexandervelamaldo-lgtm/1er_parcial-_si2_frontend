@@ -193,7 +193,7 @@ export class MapboxService {
     const token = await this.getAccessToken();
     const url =
       `https://api.mapbox.com/directions/v5/mapbox/driving/${a.lng},${a.lat};${b.lng},${b.lat}` +
-      `?access_token=${encodeURIComponent(token)}&alternatives=false&annotations=false&geometries=geojson&overview=full&steps=false`;
+      `?access_token=${encodeURIComponent(token)}&geometries=geojson&overview=full`;
 
     const data = await this.schedule(async () => {
       const res = await fetch(url, { method: 'GET', headers: { Accept: 'application/json' }, signal });
@@ -217,3 +217,4 @@ export class MapboxService {
     return result;
   }
 }
+
