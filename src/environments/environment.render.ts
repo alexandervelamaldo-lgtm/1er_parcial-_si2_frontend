@@ -13,3 +13,4 @@ export const environment = {
   },
   firebaseVapidKey: 'BLcorWjihIScKolC-ofhRCjox8E6AkHYs0lNGOF-f0G5pL6XaFfoo_3ztOP-iXar9RNk03sReFjRkHNXMscUYVs'
 };
+
