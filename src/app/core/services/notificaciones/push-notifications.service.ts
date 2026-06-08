@@ -19,14 +19,17 @@ export class PushNotificationsService {
   private readonly storagePermissionKey = 'push.permission.state';
   private readonly storagePrePromptKey = 'push.permission.preprompt.shown';
   private readonly storageVapidKey = 'push.vapid.public_key';
+  private ensureSubscribedInFlight: Promise<void> | null = null;
 
   // #region debug-point A:web-push-client-report
   private debugReport(hypothesisId: string, location: string, msg: string, data: Record<string, unknown>) {
-    fetch('http://127.0.0.1:7777/event', {
+    const debugServerUrl = this.getDebugServerUrl();
+    if (!debugServerUrl) return;
+    fetch(debugServerUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        sessionId: 'web-push-missing',
+        sessionId: 'solicitudes-runtime-errors',
         runId: 'pre-fix',
         hypothesisId,
         location,
@@ -38,9 +41,23 @@ export class PushNotificationsService {
   }
   // #endregion
 
+  private getDebugServerUrl(): string | null {
+    if (typeof window === 'undefined') return null;
+    const raw = new URLSearchParams(window.location.search).get('debugServerUrl')?.trim();
+    if (!raw) return null;
+    return /^https?:\/\//i.test(raw) ? raw : null;
+  }
+
   constructor() {
+    // #region debug-point A:constructor-state
+    this.debugReport('A', 'push-notifications.service.ts:constructor', 'push notifications service initialized', {
+      hasAuthenticatedSession: this.hasAuthenticatedSession(),
+      browserPermission: this.getBrowserPermission(),
+      isSupported: this.isSupported()
+    });
+    // #endregion
     if (this.hasAuthenticatedSession() && this.getBrowserPermission() === 'granted') {
-      void this.ensureSubscribed().catch(() => undefined);
+      this.ensureSubscribedQuietly('constructor');
     }
     window.addEventListener('online', this.handleOnline);
     document.addEventListener('visibilitychange', this.handleVisibilityChange);
@@ -90,7 +107,7 @@ export class PushNotificationsService {
     localStorage.removeItem(this.storageVapidKey);
   }
 
-  async enable(): Promise<{ ok: boolean; reason?: string }> {
+  enable(): Promise<{ ok: boolean; reason?: string }> {
     // #region debug-point A:enable-entry
     this.debugReport('A', 'push-notifications.service.ts:enable', 'enable called', {
       supported: this.isSupported(),
@@ -99,13 +116,13 @@ export class PushNotificationsService {
     });
     // #endregion
     if (!this.isSupported()) {
-      return { ok: false, reason: 'El navegador no soporta notificaciones push.' };
+      return Promise.resolve({ ok: false, reason: 'El navegador no soporta notificaciones push.' });
     }
 
     const currentPermission = this.getBrowserPermission();
     if (currentPermission === 'denied') {
       this.setStoredPermission('denied');
-      return { ok: false, reason: 'Permiso denegado en el navegador.' };
+      return Promise.resolve({ ok: false, reason: 'Permiso denegado en el navegador.' });
     }
 
     if (currentPermission !== 'granted') {
@@ -116,72 +133,115 @@ export class PushNotificationsService {
         );
         if (!accepted) {
           this.setStoredPermission('default');
-          return { ok: false, reason: 'El usuario canceló la solicitud de permiso.' };
+          return Promise.resolve({ ok: false, reason: 'El usuario canceló la solicitud de permiso.' });
         }
       }
 
-      const permission = await Notification.requestPermission();
-      this.setStoredPermission(permission);
-      if (permission !== 'granted') {
-        return { ok: false, reason: 'Permiso no concedido.' };
-      }
+      return Notification.requestPermission().then((permission) => {
+        this.setStoredPermission(permission);
+        if (permission !== 'granted') {
+          return { ok: false, reason: 'Permiso no concedido.' };
+        }
+        return this.ensureSubscribed()
+          .then(() => ({ ok: true }))
+          .catch((err) => ({ ok: false, reason: this.describeSubscriptionError(err) }));
+      });
     } else {
       this.setStoredPermission('granted');
     }
 
-    try {
-      await this.ensureSubscribed();
-      return { ok: true };
-    } catch (err) {
-      return { ok: false, reason: this.describeSubscriptionError(err) };
-    }
+    return this.ensureSubscribed()
+      .then(() => ({ ok: true }))
+      .catch((err) => ({ ok: false, reason: this.describeSubscriptionError(err) }));
   }
 
-  async disable(): Promise<void> {
-    if (!this.isSupported()) return;
-    try {
-      await this.unsubscribeFromBrowser();
-    } finally {
-      this.clearStoredVapidKey();
-      await firstValueFrom(this.api.unsubscribeWebPush());
-    }
+  disable(): Promise<void> {
+    if (!this.isSupported()) return Promise.resolve();
+    return this.unsubscribeFromBrowser()
+      .catch(() => undefined)
+      .then(() => {
+        this.clearStoredVapidKey();
+        return firstValueFrom(this.api.unsubscribeWebPush()).catch(() => undefined);
+      })
+      .then(() => undefined);
   }
 
-  async ensureSubscribed(): Promise<void> {
+  ensureSubscribed(): Promise<void> {
+    if (this.ensureSubscribedInFlight) {
+      return this.ensureSubscribedInFlight;
+    }
+
+    this.ensureSubscribedInFlight = this.ensureSubscribedInternal().finally(() => {
+      this.ensureSubscribedInFlight = null;
+    });
+    return this.ensureSubscribedInFlight;
+  }
+
+  private ensureSubscribedInternal(): Promise<void> {
     if (!this.hasAuthenticatedSession()) {
-      return;
-    }
-    const keyResponse = await firstValueFrom(this.api.getWebPushPublicKey());
-    const currentVapidKey = keyResponse.publicKey;
-    const registration = await navigator.serviceWorker.register('/push-sw.js');
-    await navigator.serviceWorker.ready;
-    const existing = await registration.pushManager.getSubscription();
-    const storedVapidKey = this.getStoredVapidKey();
-    // #region debug-point A:ensure-state
-    this.debugReport('A', 'push-notifications.service.ts:ensureSubscribed', 'ensure subscribed state evaluated', {
-      hasExistingSubscription: Boolean(existing),
-      storedVapidKey: storedVapidKey ? `${storedVapidKey.slice(0, 12)}...` : null,
-      currentVapidKey: currentVapidKey ? `${currentVapidKey.slice(0, 12)}...` : null,
-      permission: this.getBrowserPermission()
-    });
-    // #endregion
-
-    if (existing && storedVapidKey === currentVapidKey) {
-      await this.sendSubscription(existing);
-      return;
+      // #region debug-point A:ensure-skipped
+      this.debugReport('A', 'push-notifications.service.ts:ensureSubscribed', 'ensureSubscribed skipped because session is not authenticated', {
+        hasAuthenticatedSession: false
+      });
+      // #endregion
+      return Promise.resolve();
     }
 
-    if (existing) {
-      await existing.unsubscribe();
-    }
+    return firstValueFrom(this.api.getWebPushPublicKey())
+      .then((keyResponse) => {
+        const currentVapidKey = keyResponse.publicKey;
+        return navigator.serviceWorker
+          .register('/push-sw.js')
+          .then((registration) =>
+            navigator.serviceWorker.ready.then(() => ({ registration, currentVapidKey }))
+          );
+      })
+      .then(({ registration, currentVapidKey }) =>
+        registration.pushManager.getSubscription().then((existing) => ({
+          registration,
+          existing,
+          currentVapidKey,
+          storedVapidKey: this.getStoredVapidKey()
+        }))
+      )
+      .then(({ registration, existing, currentVapidKey, storedVapidKey }) => {
+        // #region debug-point A:ensure-state
+        this.debugReport('A', 'push-notifications.service.ts:ensureSubscribed', 'ensure subscribed state evaluated', {
+          hasExistingSubscription: Boolean(existing),
+          storedVapidKey: storedVapidKey ? `${storedVapidKey.slice(0, 12)}...` : null,
+          currentVapidKey: currentVapidKey ? `${currentVapidKey.slice(0, 12)}...` : null,
+          permission: this.getBrowserPermission()
+        });
+        // #endregion
 
-    const applicationServerKey = this.urlBase64ToUint8Array(currentVapidKey);
-    const subscription = await registration.pushManager.subscribe({
-      userVisibleOnly: true,
-      applicationServerKey
-    });
-    await this.sendSubscription(subscription);
-    this.setStoredVapidKey(currentVapidKey);
+        if (existing && storedVapidKey === currentVapidKey) {
+          return this.sendSubscription(existing);
+        }
+
+        const subscribe = () => {
+          const applicationServerKey = this.urlBase64ToUint8Array(currentVapidKey);
+          return registration.pushManager
+            .subscribe({
+              userVisibleOnly: true,
+              applicationServerKey
+            })
+            .then((subscription) => this.sendSubscription(subscription))
+            .then(() => {
+              this.setStoredVapidKey(currentVapidKey);
+              // #region debug-point A:ensure-complete
+              this.debugReport('A', 'push-notifications.service.ts:ensureSubscribed', 'subscription ensured successfully', {
+                storedVapidKey: currentVapidKey ? `${currentVapidKey.slice(0, 12)}...` : null
+              });
+              // #endregion
+            });
+        };
+
+        if (!existing) {
+          return subscribe();
+        }
+
+        return existing.unsubscribe().then(() => subscribe());
+      });
   }
 
   async notifyInForeground(title: string, body: string, url?: string) {
@@ -200,15 +260,17 @@ export class PushNotificationsService {
     };
   }
 
-  private async unsubscribeFromBrowser(): Promise<void> {
-    const registration = await navigator.serviceWorker.getRegistration();
-    if (!registration) return;
-    const subscription = await registration.pushManager.getSubscription();
-    if (!subscription) return;
-    await subscription.unsubscribe();
+  private unsubscribeFromBrowser(): Promise<void> {
+    return navigator.serviceWorker.getRegistration().then((registration) => {
+      if (!registration) return;
+      return registration.pushManager.getSubscription().then((subscription) => {
+        if (!subscription) return;
+        return subscription.unsubscribe().then(() => undefined);
+      });
+    });
   }
 
-  private async sendSubscription(subscription: PushSubscription) {
+  private sendSubscription(subscription: PushSubscription): Promise<void> {
     const json = subscription.toJSON();
     const payload = {
       endpoint: json.endpoint as string,
@@ -227,7 +289,7 @@ export class PushNotificationsService {
       userAgent: payload.userAgent
     });
     // #endregion
-    await firstValueFrom(this.api.subscribeWebPush(payload));
+    return firstValueFrom(this.api.subscribeWebPush(payload)).then(() => undefined);
   }
 
   private describeSubscriptionError(err: unknown): string {
@@ -251,16 +313,25 @@ export class PushNotificationsService {
 
   private readonly handleOnline = () => {
     if (this.hasAuthenticatedSession() && this.getBrowserPermission() === 'granted') {
-      void this.ensureSubscribed().catch(() => undefined);
+      this.ensureSubscribedQuietly('online');
     }
   };
 
   private readonly handleVisibilityChange = () => {
     if (document.visibilityState !== 'visible') return;
     if (this.hasAuthenticatedSession() && this.getBrowserPermission() === 'granted') {
-      void this.ensureSubscribed().catch(() => undefined);
+      this.ensureSubscribedQuietly('visibilitychange');
     }
   };
+
+  private ensureSubscribedQuietly(source: string) {
+    void this.ensureSubscribed().catch((err) => {
+      this.debugReport('A', 'push-notifications.service.ts:ensureSubscribedQuietly', 'background ensureSubscribed failed', {
+        source,
+        message: err instanceof Error ? err.message : String(err ?? ''),
+      });
+    });
+  }
 
   private hasAuthenticatedSession(): boolean {
     return this.auth.isAuthenticated() && !!this.auth.getToken();
