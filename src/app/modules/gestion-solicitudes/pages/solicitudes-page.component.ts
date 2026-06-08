@@ -276,25 +276,19 @@ export class SolicitudesPageComponent {
     forkJoin({
       solicitudes: this.api.getSolicitudesActivas({ offset: 0, limit: 200 }).pipe(
         catchError((err) => {
-          const message = this.formatHttpError(err, 'No se pudieron cargar las solicitudes activas');
-          console.error('[Solicitudes] getSolicitudesActivas error', err);
-          this.errorMessage.set(message);
+          this.setErrorMessage(err, 'No se pudieron cargar las solicitudes activas');
           return of([] as Solicitud[]);
         })
       ),
       talleres: this.api.getTalleres().pipe(
         catchError((err) => {
-          const message = this.formatHttpError(err, 'No se pudieron cargar los talleres');
-          console.error('[Solicitudes] getTalleres error', err);
-          this.errorMessage.set(this.errorMessage() ?? message);
+          this.setErrorMessage(err, 'No se pudieron cargar los talleres');
           return of([] as Taller[]);
         })
       ),
       estados: this.api.getEstadosSolicitud().pipe(
         catchError((err) => {
-          const message = this.formatHttpError(err, 'No se pudieron cargar los estados');
-          console.error('[Solicitudes] getEstadosSolicitud error', err);
-          this.errorMessage.set(this.errorMessage() ?? message);
+          this.setErrorMessage(err, 'No se pudieron cargar los estados');
           return of([] as EstadoSolicitudOption[]);
         })
       )
@@ -336,16 +330,27 @@ export class SolicitudesPageComponent {
     this.api.actualizarEstado(solicitudId, estadoId, observacion, estado).subscribe({
       next: () => this.loadData(),
       error: (err) => {
-        const message = this.formatHttpError(err, 'No se pudo actualizar el estado');
-        console.error('[Solicitudes] actualizarEstado error', err);
-        this.errorMessage.set(message);
+        this.errorMessage.set(this.formatHttpError(err, 'No se pudo actualizar el estado'));
       }
     });
   }
 
-  private formatHttpError(err: any, fallback: string): string {
-    const statusCode = typeof err?.status === 'number' ? err.status : null;
-    const detail = err?.error?.detail ?? err?.message ?? err?.statusText;
+  private setErrorMessage(err: unknown, fallback: string) {
+    this.errorMessage.set(this.errorMessage() ?? this.formatHttpError(err, fallback));
+  }
+
+  private formatHttpError(err: unknown, fallback: string): string {
+    const httpError = err as {
+      status?: number;
+      error?: { detail?: unknown } | unknown;
+      message?: unknown;
+      statusText?: unknown;
+    } | null;
+    const statusCode = typeof httpError?.status === 'number' ? httpError.status : null;
+    const detail =
+      typeof httpError?.error === 'object' && httpError?.error !== null && 'detail' in httpError.error
+        ? (httpError.error as { detail?: unknown }).detail
+        : httpError?.error ?? httpError?.message ?? httpError?.statusText;
     if (!statusCode) {
       return fallback;
     }
