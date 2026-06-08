@@ -1,3 +1,31 @@
+function getDebugServerUrl() {
+  try {
+    const raw = new URL(self.location.href).searchParams.get('debugServerUrl')?.trim();
+    if (!raw) return null;
+    return /^https?:\/\//i.test(raw) ? raw : null;
+  } catch {
+    return null;
+  }
+}
+
+function reportDebug(hypothesisId, location, msg, data) {
+  const debugServerUrl = getDebugServerUrl();
+  if (!debugServerUrl) return Promise.resolve();
+  return fetch(debugServerUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      sessionId: 'web-push-missing',
+      runId: 'pre-fix',
+      hypothesisId,
+      location,
+      msg: `[DEBUG] ${msg}`,
+      data,
+      ts: Date.now()
+    })
+  }).catch(() => undefined);
+}
+
 self.addEventListener('push', (event) => {
   const payload = (() => {
     try {
@@ -13,37 +41,26 @@ self.addEventListener('push', (event) => {
   const url = typeof data.url === 'string' ? data.url : '/';
   const targetUrl = url.startsWith('http') ? url : `${self.location.origin}${url}`;
 
-  /* #region debug-point E:sw-push-received */
-  fetch('http://127.0.0.1:7777/event', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      sessionId: 'web-push-missing',
-      runId: 'pre-fix',
-      hypothesisId: 'E',
-      location: 'frontend/public/push-sw.js:push',
-      msg: '[DEBUG] service worker push event received',
-      data: {
+  event.waitUntil(
+    Promise.all([
+      /* #region debug-point E:sw-push-received */
+      reportDebug('E', 'frontend/public/push-sw.js:push', 'service worker push event received', {
         title,
         hasBody: Boolean(body),
         targetUrl,
-      },
-      ts: Date.now()
-    })
-  }).catch(() => undefined);
-  /* #endregion */
-
-  event.waitUntil(
-    self.registration.showNotification(title, {
-      body,
-      icon: '/favicon.ico',
-      badge: '/favicon.ico',
-      data: { ...data, targetUrl },
-      actions: [
-        { action: 'open', title: 'Abrir' },
-        { action: 'close', title: 'Cerrar' }
-      ]
-    })
+      }),
+      /* #endregion */
+      self.registration.showNotification(title, {
+        body,
+        icon: '/favicon.ico',
+        badge: '/favicon.ico',
+        data: { ...data, targetUrl },
+        actions: [
+          { action: 'open', title: 'Abrir' },
+          { action: 'close', title: 'Cerrar' }
+        ]
+      })
+    ]).then(() => undefined)
   );
 });
 
