@@ -593,9 +593,7 @@ export class MapaPickerComponent implements AfterViewInit, OnChanges, OnDestroy 
     }
 
     try {
-      const mod = await import('mapbox-gl');
-      this.mapboxgl = mod.default;
-      this.mapboxgl.accessToken = await this.mapbox.getAccessToken();
+      this.mapboxgl = await this.mapbox.loadMapboxGl();
     } catch (err: any) {
       this.loadError = 'No se pudo cargar Mapbox GL.';
       return;
@@ -1132,3 +1130,4 @@ export class MapaPickerComponent implements AfterViewInit, OnChanges, OnDestroy 
       .replaceAll("'", '&#039;');
   }
 }
+
