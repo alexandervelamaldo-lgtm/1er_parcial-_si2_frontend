@@ -2,6 +2,8 @@ import { CommonModule } from '@angular/common';
 import { Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
+import { forkJoin, of } from 'rxjs';
+import { catchError, finalize } from 'rxjs/operators';
 
 import { EmergencyApiService } from '../../../core/services/gestion-solicitudes/emergency-api.service';
 import { AuthService } from '../../../core/services/autenticacion-acceso/auth.service';
@@ -32,7 +34,12 @@ import { AppIconComponent } from '../../../shared/components/app-icon/app-icon.c
           <span>{{ notice }}</span>
         </div>
 
-        <div *ngIf="solicitudes().length === 0 && !isLoading()" class="empty-state">
+        <div class="error-notice" *ngIf="errorMessage() as message">
+          <app-icon name="alert" [size]="18" />
+          <span>{{ message }}</span>
+        </div>
+
+        <div *ngIf="solicitudes().length === 0 && !isLoading() && !errorMessage()" class="empty-state">
           <div class="empty-icon" aria-hidden="true"><app-icon name="folder" [size]="36" /></div>
           <p>No hay solicitudes pendientes de atención.</p>
         </div>
@@ -126,6 +133,12 @@ import { AppIconComponent } from '../../../shared/components/app-icon/app-icon.c
       padding: 0.85rem 1rem; border-radius: 12px;
       background: #fff7ed; color: #9a3412; border: 1px solid #fdba74;
       font-weight: 600;
+    }
+    .error-notice {
+      display: flex; align-items: center; gap: 0.6rem;
+      padding: 0.85rem 1rem; border-radius: 12px;
+      background: #fef2f2; color: #991b1b; border: 1px solid #fecaca;
+      font-weight: 700;
     }
 
     .request-card {
@@ -239,6 +252,7 @@ export class SolicitudesPageComponent {
   readonly estados = signal<EstadoSolicitudOption[]>([]);
   readonly isLoading = signal(false);
   readonly accessNotice = signal<string | null>(null);
+  readonly errorMessage = signal<string | null>(null);
 
   readonly canAssign = computed(() => this.authService.hasAnyRole(['ADMINISTRADOR', 'OPERADOR']));
   // El operador propone un TALLER (no un técnico): el backend buscará un técnico
@@ -257,13 +271,40 @@ export class SolicitudesPageComponent {
 
   loadData() {
     this.isLoading.set(true);
-    // Para simplificar, asumimos que todas las llamadas terminan
-    this.api.getSolicitudesActivas().subscribe((data) => {
-      this.solicitudes.set(data);
-      this.isLoading.set(false);
-    });
-    this.api.getTalleres().subscribe((data) => this.talleres.set(data));
-    this.api.getEstadosSolicitud().subscribe((data) => this.estados.set(data));
+    this.errorMessage.set(null);
+
+    forkJoin({
+      solicitudes: this.api.getSolicitudesActivas({ offset: 0, limit: 200 }).pipe(
+        catchError((err) => {
+          const message = this.formatHttpError(err, 'No se pudieron cargar las solicitudes activas');
+          console.error('[Solicitudes] getSolicitudesActivas error', err);
+          this.errorMessage.set(message);
+          return of([] as Solicitud[]);
+        })
+      ),
+      talleres: this.api.getTalleres().pipe(
+        catchError((err) => {
+          const message = this.formatHttpError(err, 'No se pudieron cargar los talleres');
+          console.error('[Solicitudes] getTalleres error', err);
+          this.errorMessage.set(this.errorMessage() ?? message);
+          return of([] as Taller[]);
+        })
+      ),
+      estados: this.api.getEstadosSolicitud().pipe(
+        catchError((err) => {
+          const message = this.formatHttpError(err, 'No se pudieron cargar los estados');
+          console.error('[Solicitudes] getEstadosSolicitud error', err);
+          this.errorMessage.set(this.errorMessage() ?? message);
+          return of([] as EstadoSolicitudOption[]);
+        })
+      )
+    })
+      .pipe(finalize(() => this.isLoading.set(false)))
+      .subscribe(({ solicitudes, talleres, estados }) => {
+        this.solicitudes.set(solicitudes);
+        this.talleres.set(talleres);
+        this.estados.set(estados);
+      });
   }
 
   assign(solicitudId: number) {
@@ -291,7 +332,24 @@ export class SolicitudesPageComponent {
   changeStatusByName(solicitudId: number, estado: string, observacion: string) {
     const estadoId = this.estados().find((item) => item.nombre === estado)?.id;
     if (!estadoId) return;
-    this.api.actualizarEstado(solicitudId, estadoId, observacion, estado).subscribe(() => this.loadData());
+    this.errorMessage.set(null);
+    this.api.actualizarEstado(solicitudId, estadoId, observacion, estado).subscribe({
+      next: () => this.loadData(),
+      error: (err) => {
+        const message = this.formatHttpError(err, 'No se pudo actualizar el estado');
+        console.error('[Solicitudes] actualizarEstado error', err);
+        this.errorMessage.set(message);
+      }
+    });
+  }
+
+  private formatHttpError(err: any, fallback: string): string {
+    const statusCode = typeof err?.status === 'number' ? err.status : null;
+    const detail = err?.error?.detail ?? err?.message ?? err?.statusText;
+    if (!statusCode) {
+      return fallback;
+    }
+    return detail ? `${fallback} (${statusCode}): ${detail}` : `${fallback} (${statusCode})`;
   }
 
   formatBs(amount: number | null | undefined) {
