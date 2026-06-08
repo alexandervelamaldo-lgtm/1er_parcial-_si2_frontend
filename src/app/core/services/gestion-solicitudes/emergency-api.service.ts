@@ -54,15 +54,29 @@ export class EmergencyApiService {
     return new HttpHeaders(headers);
   }
 
-  getSolicitudesActivas() {
+  getSolicitudesActivas(options?: { offset?: number; limit?: number }) {
+    const params = new HttpParams({
+      fromObject: {
+        offset: String(options?.offset ?? 0),
+        limit: String(options?.limit ?? 200)
+      }
+    });
     return this.http.get<Solicitud[]>(`${environment.apiUrl}/solicitudes/activas`, {
-      headers: this.headers
+      headers: this.headers,
+      params
     });
   }
 
-  getSolicitudes() {
+  getSolicitudes(options?: { offset?: number; limit?: number }) {
+    const params = new HttpParams({
+      fromObject: {
+        offset: String(options?.offset ?? 0),
+        limit: String(options?.limit ?? 200)
+      }
+    });
     return this.http.get<Solicitud[]>(`${environment.apiUrl}/solicitudes`, {
-      headers: this.headers
+      headers: this.headers,
+      params
     });
   }
 
