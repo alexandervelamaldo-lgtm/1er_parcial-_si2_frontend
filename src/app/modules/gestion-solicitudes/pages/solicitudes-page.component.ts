@@ -291,7 +291,7 @@ export class SolicitudesPageComponent {
   changeStatusByName(solicitudId: number, estado: string, observacion: string) {
     const estadoId = this.estados().find((item) => item.nombre === estado)?.id;
     if (!estadoId) return;
-    this.api.actualizarEstado(solicitudId, estadoId, observacion).subscribe(() => this.loadData());
+    this.api.actualizarEstado(solicitudId, estadoId, observacion, estado).subscribe(() => this.loadData());
   }
 
   formatBs(amount: number | null | undefined) {
