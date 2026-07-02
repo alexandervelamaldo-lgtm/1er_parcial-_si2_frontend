@@ -27,7 +27,10 @@ export type IconName =
   | 'menu'
   | 'calendar'
   | 'download'
-  | 'trending-up';
+  | 'trending-up'
+  | 'message'
+  | 'send'
+  | 'x';
 
 type IconDef = {
   viewBox: string;
@@ -139,6 +142,18 @@ const ICONS: Record<IconName, IconDef> = {
   'trending-up': {
     viewBox: '0 0 24 24',
     paths: ['M22 7l-8.5 8.5-5-5L2 17', 'M16 7h6v6']
+  },
+  message: {
+    viewBox: '0 0 24 24',
+    paths: ['M4 5.5A1.5 1.5 0 0 1 5.5 4h13A1.5 1.5 0 0 1 20 5.5v9A1.5 1.5 0 0 1 18.5 16H9l-4.5 4v-4h-.0A1.5 1.5 0 0 1 4 14.5v-9Z']
+  },
+  send: {
+    viewBox: '0 0 24 24',
+    paths: ['M4 20 20.5 12 4 4l2 7 10 1-10 1-2 7Z']
+  },
+  x: {
+    viewBox: '0 0 24 24',
+    paths: ['M5 5l14 14', 'M19 5 5 19']
   }
 };
 
