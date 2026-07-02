@@ -78,8 +78,8 @@ export class App {
     {
       packageName: 'inteligencia-automatizacion',
       title: 'Inteligencia',
-      items: [],
-      contextualHint: 'Disponible desde el detalle de cada solicitud.'
+      items: [{ label: 'Asistente virtual', path: '/chat' }],
+      contextualHint: 'El análisis de imágenes está disponible desde el detalle de cada solicitud.'
     },
     {
       // ── SaaS multi-tenant section ─────────────────────────────────────
@@ -105,7 +105,8 @@ export class App {
     '/notificaciones': 'bell',
     '/trabajos': 'car',
     '/historial': 'clock',
-    '/super-admin/tenants': 'shield'
+    '/super-admin/tenants': 'shield',
+    '/chat': 'message'
   };
 
   protected readonly isAuthenticated = computed(() => this.authService.isAuthenticated());
