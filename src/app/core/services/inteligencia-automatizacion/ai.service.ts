@@ -29,6 +29,14 @@ export type AiVoiceReportNarrationRequest = {
 
 export type AiVoiceReportNarrationResponse = { narration: string; provider: string; latency_ms: number };
 
+export type AiChatRole = 'user' | 'assistant';
+
+export type AiChatMessage = { role: AiChatRole; content: string };
+
+export type AiChatRequest = { message: string; history: AiChatMessage[] };
+
+export type AiChatResponse = { reply: string; provider: string; model: string; latency_ms: number };
+
 export type AiImageAnalyzeResponse = {
   allowed: boolean;
   categories: string[];
@@ -62,6 +70,16 @@ export class AiService {
 
   generateText(payload: AiTextGenerateRequest) {
     return this.http.post<AiTextGenerateResponse>(`${environment.apiUrl}/ai/text/generate`, payload, {
+      headers: this.auth.getAuthHeaders()
+    });
+  }
+
+  /**
+   * Envía un mensaje al chatbot (Groq) junto con el historial reciente de
+   * la conversación, para que el modelo mantenga contexto entre turnos.
+   */
+  chat(payload: AiChatRequest) {
+    return this.http.post<AiChatResponse>(`${environment.apiUrl}/ai/chat`, payload, {
       headers: this.auth.getAuthHeaders()
     });
   }
