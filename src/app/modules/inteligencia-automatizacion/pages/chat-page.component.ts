@@ -1,10 +1,14 @@
 import { CommonModule } from '@angular/common';
-import { Component, ElementRef, ViewChild, inject, signal } from '@angular/core';
+import { Component, ElementRef, ViewChild, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { firstValueFrom } from 'rxjs';
 
+import { AuthService } from '../../../core/services/autenticacion-acceso/auth.service';
 import { AiChatMessage, AiService } from '../../../core/services/inteligencia-automatizacion/ai.service';
 import { AppIconComponent } from '../../../shared/components/app-icon/app-icon.component';
+
+/** Roles que habilitan el modo administrativo del chat (KPIs del tenant). */
+const ADMIN_ROLES = ['ADMINISTRADOR', 'ADMIN_TENANT', 'OPERADOR'];
 
 type ChatDisplayMessage = AiChatMessage & { failed?: boolean };
 
@@ -20,18 +24,44 @@ const MAX_HISTORIAL_ENVIADO = 20;
   template: `
     <section class="chat-page">
       <header class="chat-page__header">
-        <h1><app-icon name="message" [size]="22" /> Asistente virtual</h1>
-        <p class="hint">
+        <h1>
+          <app-icon [name]="isAdminMode() ? 'signal' : 'message'" [size]="22" />
+          {{ isAdminMode() ? 'Asistente ejecutivo' : 'Asistente virtual' }}
+        </h1>
+        <p class="hint" *ngIf="!isAdminMode()">
           Preguntame cómo reportar una emergencia, hacer seguimiento a una solicitud
           o cualquier duda sobre la plataforma.
+        </p>
+        <p class="hint" *ngIf="isAdminMode()">
+          Consultá KPIs del tenant en tiempo real: cuántos trabajos hay, qué clientes
+          generan más solicitudes, top técnicos y talleres, tiempos promedio,
+          ingresos de los últimos 30 días, etc.
         </p>
       </header>
 
       <div class="chat-card glass-card">
         <div class="chat-body" #scrollAnchor>
-          <p class="chat-empty" *ngIf="messages().length === 0">
+          <p class="chat-empty" *ngIf="messages().length === 0 && !isAdminMode()">
             Todavía no escribiste nada. Escribe tu primer mensaje para empezar la conversación.
           </p>
+          <div class="chat-suggestions" *ngIf="messages().length === 0 && isAdminMode()">
+            <p class="chat-empty">Probá con preguntas como:</p>
+            <button type="button" class="suggestion" (click)="usarSugerencia('¿Cuántos trabajos completó el tenant este mes?')">
+              ¿Cuántos trabajos completó el tenant?
+            </button>
+            <button type="button" class="suggestion" (click)="usarSugerencia('¿Qué cliente generó más solicitudes?')">
+              ¿Qué cliente genera más solicitudes?
+            </button>
+            <button type="button" class="suggestion" (click)="usarSugerencia('Top 3 técnicos por trabajos completados')">
+              Top 3 técnicos por trabajos completados
+            </button>
+            <button type="button" class="suggestion" (click)="usarSugerencia('¿Cuánto se cobró en los últimos 30 días?')">
+              ¿Cuánto se cobró en los últimos 30 días?
+            </button>
+            <button type="button" class="suggestion" (click)="usarSugerencia('¿Cuáles son los tipos de incidente más frecuentes?')">
+              Tipos de incidente más frecuentes
+            </button>
+          </div>
           <div
             class="chat-bubble"
             *ngFor="let msg of messages()"
@@ -115,6 +145,29 @@ const MAX_HISTORIAL_ENVIADO = 20;
         font-size: 0.9rem;
         margin: auto 0;
         text-align: center;
+      }
+
+      .chat-suggestions {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 0.5rem;
+        margin: auto 0;
+      }
+      .chat-suggestions .suggestion {
+        border: 1px solid rgba(203, 213, 225, 0.8);
+        background: #fff;
+        color: #0f172a;
+        border-radius: 999px;
+        padding: 0.45rem 0.9rem;
+        font-size: 0.86rem;
+        cursor: pointer;
+        max-width: 90%;
+        transition: background 0.15s, border-color 0.15s;
+      }
+      .chat-suggestions .suggestion:hover {
+        background: #f1f5f9;
+        border-color: #1d4ed8;
       }
 
       .chat-bubble {
@@ -206,10 +259,15 @@ const MAX_HISTORIAL_ENVIADO = 20;
 })
 export class ChatPageComponent {
   private readonly ai = inject(AiService);
+  private readonly auth = inject(AuthService);
 
   readonly busy = signal(false);
   readonly error = signal('');
   readonly messages = signal<ChatDisplayMessage[]>([]);
+  /** True cuando el usuario tiene rol admin/operador — usa el chat con KPIs. */
+  readonly isAdminMode = computed(() =>
+    this.auth.currentRoles().some((r) => ADMIN_ROLES.includes(r))
+  );
   borrador = '';
 
   @ViewChild('scrollAnchor') private scrollAnchor?: ElementRef<HTMLDivElement>;
@@ -230,7 +288,12 @@ export class ChatPageComponent {
       .map(({ role, content }) => ({ role, content }));
 
     try {
-      const res = await firstValueFrom(this.ai.chat({ message: texto, history: historial }));
+      // Admin/operador → endpoint con snapshot de KPIs del tenant.
+      // Cliente/técnico/taller/otros → chatbot general de la plataforma.
+      const call$ = this.isAdminMode()
+        ? this.ai.chatAdmin({ message: texto, history: historial })
+        : this.ai.chat({ message: texto, history: historial });
+      const res = await firstValueFrom(call$);
       this.messages.update((prev) => [...prev, { role: 'assistant', content: res.reply }]);
     } catch (err: any) {
       const detail = err?.error?.detail;
@@ -243,6 +306,12 @@ export class ChatPageComponent {
       this.busy.set(false);
       this.scrollToBottom();
     }
+  }
+
+  usarSugerencia(texto: string): void {
+    if (this.busy()) return;
+    this.borrador = texto;
+    void this.enviar();
   }
 
   private scrollToBottom(): void {

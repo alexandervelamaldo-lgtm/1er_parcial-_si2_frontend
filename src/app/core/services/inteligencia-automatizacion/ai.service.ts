@@ -37,6 +37,12 @@ export type AiChatRequest = { message: string; history: AiChatMessage[] };
 
 export type AiChatResponse = { reply: string; provider: string; model: string; latency_ms: number };
 
+export type AiChatAdminResponse = AiChatResponse & {
+  /** Snapshot de KPIs que el backend inyectó al LLM. El front lo puede
+   *  mostrar como referencia opcional. */
+  context_summary: Record<string, any> | null;
+};
+
 export type AiImageAnalyzeResponse = {
   allowed: boolean;
   categories: string[];
@@ -80,6 +86,14 @@ export class AiService {
    */
   chat(payload: AiChatRequest) {
     return this.http.post<AiChatResponse>(`${environment.apiUrl}/ai/chat`, payload, {
+      headers: this.auth.getAuthHeaders()
+    });
+  }
+
+  /** Chat administrativo: el backend inyecta un snapshot de KPIs del tenant
+   *  como contexto. Solo disponible para ADMINISTRADOR/ADMIN_TENANT/OPERADOR. */
+  chatAdmin(payload: AiChatRequest) {
+    return this.http.post<AiChatAdminResponse>(`${environment.apiUrl}/ai/chat/admin`, payload, {
       headers: this.auth.getAuthHeaders()
     });
   }
