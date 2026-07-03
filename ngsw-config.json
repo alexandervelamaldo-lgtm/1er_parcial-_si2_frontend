@@ -1,0 +1,120 @@
+{
+  "$schema": "./node_modules/@angular/service-worker/config/schema.json",
+  "index": "/index.html",
+  "assetGroups": [
+    {
+      "name": "app-shell",
+      "installMode": "prefetch",
+      "updateMode": "prefetch",
+      "resources": {
+        "files": [
+          "/favicon.ico",
+          "/index.html",
+          "/manifest.webmanifest",
+          "/*.css",
+          "/*.js"
+        ]
+      }
+    },
+    {
+      "name": "assets-lazy",
+      "installMode": "lazy",
+      "updateMode": "prefetch",
+      "resources": {
+        "files": [
+          "/assets/**",
+          "/push-sw.js",
+          "/*.(svg|png|jpg|jpeg|gif|webp|ico|woff|woff2|ttf|eot)"
+        ]
+      }
+    }
+  ],
+  "dataGroups": [
+    {
+      "name": "api-config-estatica",
+      "urls": [
+        "/api/config/maps-key",
+        "/api/tipos-incidente",
+        "/api/estados"
+      ],
+      "cacheConfig": {
+        "strategy": "performance",
+        "maxSize": 20,
+        "maxAge": "24h",
+        "timeout": "5s"
+      }
+    },
+    {
+      "name": "api-solicitudes",
+      "urls": [
+        "/api/solicitudes",
+        "/api/solicitudes?**"
+      ],
+      "cacheConfig": {
+        "strategy": "freshness",
+        "maxSize": 50,
+        "maxAge": "5m",
+        "timeout": "4s"
+      }
+    },
+    {
+      "name": "api-solicitud-detalle",
+      "urls": [
+        "/api/solicitudes/**"
+      ],
+      "cacheConfig": {
+        "strategy": "freshness",
+        "maxSize": 30,
+        "maxAge": "3m",
+        "timeout": "4s"
+      }
+    },
+    {
+      "name": "api-talleres-tecnicos",
+      "urls": [
+        "/api/talleres",
+        "/api/talleres/**",
+        "/api/tecnicos",
+        "/api/tecnicos/**"
+      ],
+      "cacheConfig": {
+        "strategy": "freshness",
+        "maxSize": 40,
+        "maxAge": "10m",
+        "timeout": "5s"
+      }
+    },
+    {
+      "name": "api-notificaciones",
+      "urls": [
+        "/api/notificaciones"
+      ],
+      "cacheConfig": {
+        "strategy": "freshness",
+        "maxSize": 50,
+        "maxAge": "2m",
+        "timeout": "3s"
+      }
+    },
+    {
+      "name": "api-kpis-reportes",
+      "urls": [
+        "/api/kpis/**"
+      ],
+      "cacheConfig": {
+        "strategy": "freshness",
+        "maxSize": 10,
+        "maxAge": "5m",
+        "timeout": "6s"
+      }
+    }
+  ],
+  "navigationUrls": [
+    "/**",
+    "!/**/*.*",
+    "!/api/**",
+    "!/realtime/**",
+    "!/ws/**"
+  ]
+}
+

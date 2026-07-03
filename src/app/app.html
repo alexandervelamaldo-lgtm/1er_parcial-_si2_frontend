@@ -1,0 +1,80 @@
+<div class="shell" *ngIf="isAuthenticated(); else authView" [class.sidebar-collapsed]="sidebarCollapsed" [class.mobile-open]="mobileMenuOpen">
+  <aside class="sidebar">
+    <div class="sidebar-top">
+      <div class="brand">
+        <div class="brand-logo">
+          <app-icon name="shield" [size]="22" />
+        </div>
+        <div class="brand-text">
+          <h1>Emergency</h1>
+          <span class="brand-sub">Centro de Operaciones</span>
+        </div>
+      </div>
+
+      <div class="user-card" *ngIf="profile() as profile">
+        <div class="user-avatar">{{ profile.user.email.substring(0, 2).toUpperCase() }}</div>
+        <div class="user-info">
+          <strong>{{ profile.user.email.split('@')[0] }}</strong>
+          <span>{{ roleLabel() }}</span>
+        </div>
+      </div>
+    </div>
+
+    <nav>
+      <section class="menu-section" *ngFor="let section of visibleNavigationSections()">
+        <h2>{{ section.title }}</h2>
+        <a *ngFor="let item of section.items" [routerLink]="item.path" routerLinkActive="active">
+          <app-icon [name]="getNavIcon(item.path)" [size]="18" />
+          <span class="nav-label">{{ item.label }}</span>
+        </a>
+        <p class="context-hint" *ngIf="section.contextualHint">{{ section.contextualHint }}</p>
+      </section>
+    </nav>
+
+    <div class="sidebar-bottom">
+      <button class="collapse-btn" type="button" (click)="toggleSidebar()" aria-label="Colapsar menú">
+        <app-icon name="chevron-left" [size]="18" />
+      </button>
+      <button class="logout" type="button" (click)="logout()">
+        <app-icon name="lock" [size]="16" />
+        <span class="nav-label">Cerrar sesión</span>
+      </button>
+    </div>
+  </aside>
+
+  <main class="content">
+    <header class="topbar">
+      <button class="mobile-menu-btn" type="button" (click)="toggleMobileMenu()">
+        <app-icon name="menu" [size]="22" />
+      </button>
+      <div class="topbar-info">
+        <span class="breadcrumb">Panel Web</span>
+      </div>
+      <div class="topbar-actions">
+        <a routerLink="/notificaciones" class="topbar-icon-btn" aria-label="Notificaciones">
+          <app-icon name="bell" [size]="18" />
+        </a>
+        <a routerLink="/perfil" class="topbar-icon-btn" aria-label="Perfil">
+          <app-icon name="user" [size]="18" />
+        </a>
+      </div>
+    </header>
+    <div class="live-notification" *ngIf="liveNotification() as live">
+      <div class="live-notification__content">
+        <strong>{{ live.title }}</strong>
+        <span>{{ live.message }}</span>
+      </div>
+      <a [routerLink]="live.url" class="live-notification__action" (click)="dismissLiveNotification()">Abrir</a>
+      <button type="button" class="live-notification__close" (click)="dismissLiveNotification()" aria-label="Cerrar aviso">x</button>
+    </div>
+    <div class="page-content">
+      <router-outlet />
+    </div>
+  </main>
+
+  <div class="mobile-overlay" [class.visible]="mobileMenuOpen" (click)="toggleMobileMenu()"></div>
+</div>
+
+<ng-template #authView>
+  <router-outlet />
+</ng-template>

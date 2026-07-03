@@ -1,0 +1,16 @@
+{
+  "name": "Sistema de Emergencia Vehicular",
+  "short_name": "Emergencia",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#2563eb",
+  "icons": [
+    {
+      "src": "/favicon.ico",
+      "sizes": "48x48",
+      "type": "image/x-icon"
+    }
+  ]
+}
+
