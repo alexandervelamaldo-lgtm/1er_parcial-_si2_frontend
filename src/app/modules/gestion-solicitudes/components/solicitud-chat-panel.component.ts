@@ -217,7 +217,10 @@ export class SolicitudChatPanelComponent implements OnInit, OnChanges, OnDestroy
   /** Cuando true, el composer queda deshabilitado (solicitud cerrada/cancelada). */
   @Input() disabled = false;
   /** Rol del usuario en sesión, para el label del header. */
-  @Input() miRol: 'cliente' | 'tecnico' = 'cliente';
+  @Input() miRol: 'cliente' | 'tecnico' | 'taller' = 'cliente';
+  /** Cuando el que mira es el cliente: hay técnico ya asignado o solo taller.
+   *  Se usa para elegir el label del header ("técnico" vs "taller"). */
+  @Input() hayTecnicoAsignado = false;
   /** Motivo del composer deshabilitado (para mostrar al usuario). */
   @Input() disabledReasonText = 'Esta solicitud ya no está activa. Solo se muestra el historial.';
 
@@ -282,7 +285,12 @@ export class SolicitudChatPanelComponent implements OnInit, OnChanges, OnDestroy
   }
 
   contraparteLabel(): string {
-    return this.miRol === 'cliente' ? 'técnico' : 'cliente';
+    // Cliente ve al técnico si ya está asignado, si no ve al taller.
+    // Taller y técnico siempre ven al cliente del otro lado.
+    if (this.miRol === 'cliente') {
+      return this.hayTecnicoAsignado ? 'técnico' : 'taller';
+    }
+    return 'cliente';
   }
 
   disabledReason(): string {

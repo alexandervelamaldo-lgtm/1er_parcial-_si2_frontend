@@ -4,11 +4,13 @@ import { Injectable, inject } from '@angular/core';
 import { environment } from '../../../../environments/environment';
 import { AuthService } from '../autenticacion-acceso/auth.service';
 
+export type SolicitudChatRole = 'cliente' | 'tecnico' | 'taller';
+
 export interface SolicitudChatMessage {
   id: number;
   solicitud_id: number;
   sender_user_id: number;
-  sender_role: 'cliente' | 'tecnico';
+  sender_role: SolicitudChatRole;
   sender_display_name: string;
   content: string;
   created_at: string;

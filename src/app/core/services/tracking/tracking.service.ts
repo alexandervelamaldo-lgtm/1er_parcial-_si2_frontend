@@ -30,7 +30,7 @@ export type ChatMessageEvent = {
   message: {
     id: number;
     sender_user_id: number;
-    sender_role: 'cliente' | 'tecnico';
+    sender_role: 'cliente' | 'tecnico' | 'taller';
     sender_display_name: string;
     content: string;
     created_at: string | null;

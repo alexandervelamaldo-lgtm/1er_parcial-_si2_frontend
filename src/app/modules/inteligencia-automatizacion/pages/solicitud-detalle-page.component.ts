@@ -421,15 +421,18 @@ import { SolicitudChatPanelComponent } from '../../gestion-solicitudes/component
             />
           </article>
 
-          <!-- Chat en vivo cliente ↔ técnico. Solo se monta para el CLIENTE
-               dueño o el TÉCNICO asignado; el backend además valida cada
-               request contra la solicitud, así que este *ngIf es UX, no
-               seguridad. -->
+          <!-- Chat en vivo cliente ↔ (taller o técnico asignado). Solo se
+               monta si el usuario logueado es participante válido y hay
+               contraparte; el backend además re-valida cada request. -->
           <app-solicitud-chat-panel
             *ngIf="chatRole() as rol"
             [solicitudId]="solicitud.id"
             [miRol]="rol"
-            [disabled]="isChatDisabled()"
+            [hayTecnicoAsignado]="chatHasTecnico()"
+            [disabled]="isChatDisabled() || !chatHasContraparte()"
+            [disabledReasonText]="!chatHasContraparte()
+              ? 'Aún no hay taller ni técnico asignado a esta solicitud.'
+              : 'Esta solicitud ya no está activa. Solo se muestra el historial.'"
           />
 
           <article class="glass-card action-box" *ngIf="canSimulateDispatch()">
@@ -845,11 +848,19 @@ export class SolicitudDetallePageComponent implements OnDestroy {
   readonly roleNames = computed(() => this.authService.currentRoles());
   readonly canAssign = computed(() => this.roleNames().some((role) => ['ADMINISTRADOR', 'OPERADOR'].includes(role)));
   /** Rol que juega el usuario en el chat de la solicitud (null → no ve chat). */
-  readonly chatRole = computed<'cliente' | 'tecnico' | null>(() => {
+  readonly chatRole = computed<'cliente' | 'tecnico' | 'taller' | null>(() => {
     const roles = this.roleNames();
     if (roles.includes('CLIENTE')) return 'cliente';
     if (roles.includes('TECNICO')) return 'tecnico';
+    if (roles.includes('TALLER')) return 'taller';
     return null;
+  });
+  /** Hay técnico asignado (para elegir el label del header del chat). */
+  readonly chatHasTecnico = computed<boolean>(() => (this.solicitud()?.tecnico_id ?? null) !== null);
+  /** Hay contraparte con quien chatear (taller o técnico). */
+  readonly chatHasContraparte = computed<boolean>(() => {
+    const s = this.solicitud();
+    return (s?.tecnico_id ?? null) !== null || (s?.taller_id ?? null) !== null;
   });
   /** El composer se apaga si la solicitud ya cerró — pero seguimos mostrando historial. */
   readonly isChatDisabled = computed<boolean>(() => {
