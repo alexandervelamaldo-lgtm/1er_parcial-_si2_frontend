@@ -60,14 +60,29 @@ import { AppIconComponent } from '../../../shared/components/app-icon/app-icon.c
           class="chat-bubble"
           *ngFor="let msg of messages(); trackBy: trackById"
           [class.chat-bubble--mine]="msg.sender_user_id === myUserId()"
+          [class.chat-bubble--audio]="!!msg.audio"
         >
           <span class="chat-bubble__author">{{ msg.sender_display_name }}</span>
-          <span class="chat-bubble__content">{{ msg.content }}</span>
+          <span class="chat-bubble__content" *ngIf="!msg.audio && msg.content">{{ msg.content }}</span>
+          <div class="chat-bubble__audio" *ngIf="msg.audio">
+            <audio controls preload="metadata" [src]="absoluteAudioUrl(msg.audio.url)"></audio>
+            <span class="chat-bubble__audio-meta">
+              🎙️
+              <span *ngIf="msg.audio.duration_ms">{{ formatDuration(msg.audio.duration_ms) }}</span>
+              <span *ngIf="!msg.audio.duration_ms">Nota de voz</span>
+            </span>
+          </div>
           <span class="chat-bubble__time">{{ msg.created_at | date:'shortTime' }}</span>
         </div>
       </div>
 
       <p class="chat-panel__error" *ngIf="error()">{{ error() }}</p>
+
+      <div class="chat-panel__recording" *ngIf="recording()">
+        <span class="chat-panel__recording-dot"></span>
+        Grabando… {{ formatDuration(recordingElapsedMs()) }}
+        <button type="button" class="chat-panel__recording-cancel" (click)="cancelarGrabacion()">Cancelar</button>
+      </div>
 
       <form class="chat-panel__composer" (ngSubmit)="enviar()">
         <input
@@ -75,13 +90,24 @@ import { AppIconComponent } from '../../../shared/components/app-icon/app-icon.c
           name="mensaje"
           placeholder="Escribe un mensaje…"
           [(ngModel)]="borrador"
-          [disabled]="disabled || sending()"
+          [disabled]="disabled || sending() || recording()"
           autocomplete="off"
           maxlength="2000"
         />
         <button
+          type="button"
+          class="chat-panel__mic"
+          [class.chat-panel__mic--active]="recording()"
+          [disabled]="disabled || sending()"
+          (click)="toggleGrabacion()"
+          [attr.aria-label]="recording() ? 'Detener y enviar nota de voz' : 'Grabar nota de voz'"
+          title="Nota de voz"
+        >
+          <app-icon [name]="recording() ? 'send' : 'message'" [size]="16" />
+        </button>
+        <button
           type="submit"
-          [disabled]="disabled || sending() || !borrador.trim()"
+          [disabled]="disabled || sending() || recording() || !borrador.trim()"
           aria-label="Enviar mensaje"
         >
           <app-icon name="send" [size]="16" />
@@ -209,6 +235,62 @@ import { AppIconComponent } from '../../../shared/components/app-icon/app-icon.c
         opacity: 0.45;
         cursor: not-allowed;
       }
+      .chat-panel__mic {
+        background: #64748b;
+      }
+      .chat-panel__mic--active {
+        background: #dc2626;
+      }
+
+      .chat-bubble--audio .chat-bubble__audio {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        margin-top: 2px;
+      }
+      .chat-bubble--audio audio {
+        max-width: 260px;
+        min-width: 200px;
+        height: 32px;
+      }
+      .chat-bubble__audio-meta {
+        font-size: 0.72rem;
+        opacity: 0.75;
+        font-weight: 500;
+      }
+
+      .chat-panel__recording {
+        display: flex;
+        align-items: center;
+        gap: 0.6rem;
+        padding: 0.55rem 1rem;
+        background: #fef2f2;
+        color: #b91c1c;
+        font-size: 0.85rem;
+        border-top: 1px solid rgba(203, 213, 225, 0.6);
+      }
+      .chat-panel__recording-dot {
+        display: inline-block;
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: #dc2626;
+        animation: chatRecordingPulse 1s infinite ease-in-out;
+      }
+      .chat-panel__recording-cancel {
+        margin-left: auto;
+        background: transparent;
+        color: #b91c1c;
+        border: 1px solid rgba(220, 38, 38, 0.4);
+        border-radius: 6px;
+        padding: 3px 10px;
+        font-size: 0.75rem;
+        cursor: pointer;
+      }
+      @keyframes chatRecordingPulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.35; }
+      }
     `
   ]
 })
@@ -233,7 +315,16 @@ export class SolicitudChatPanelComponent implements OnInit, OnChanges, OnDestroy
   readonly sending = signal(false);
   readonly error = signal<string | null>(null);
   readonly myUserId = signal<number | null>(null);
+  readonly recording = signal(false);
+  readonly recordingElapsedMs = signal(0);
   borrador = '';
+
+  private mediaRecorder: MediaRecorder | null = null;
+  private mediaStream: MediaStream | null = null;
+  private recordingChunks: Blob[] = [];
+  private recordingStartedAt = 0;
+  private recordingTimer: number | null = null;
+  private recordingCanceled = false;
 
   @ViewChild('scrollAnchor') private scrollAnchor?: ElementRef<HTMLDivElement>;
 
@@ -255,7 +346,15 @@ export class SolicitudChatPanelComponent implements OnInit, OnChanges, OnDestroy
         sender_display_name: ev.message.sender_display_name,
         content: ev.message.content,
         created_at: ev.message.created_at ?? new Date().toISOString(),
-        read_at: null
+        read_at: null,
+        audio: ev.message.audio
+          ? {
+              content_type: ev.message.audio.content_type,
+              duration_ms: ev.message.audio.duration_ms,
+              size_bytes: ev.message.audio.size_bytes,
+              url: ev.message.audio.url,
+            }
+          : null,
       };
       this.messages.update((prev) => [...prev, nueva]);
       this.scrollToBottom();
@@ -281,6 +380,11 @@ export class SolicitudChatPanelComponent implements OnInit, OnChanges, OnDestroy
   }
 
   ngOnDestroy(): void {
+    this.recordingCanceled = true;
+    if (this.mediaRecorder && this.mediaRecorder.state !== 'inactive') {
+      try { this.mediaRecorder.stop(); } catch {}
+    }
+    this._cleanupRecording();
     this.tracking.disconnect();
   }
 
@@ -299,6 +403,146 @@ export class SolicitudChatPanelComponent implements OnInit, OnChanges, OnDestroy
 
   trackById(_: number, msg: SolicitudChatMessage): number {
     return msg.id;
+  }
+
+  absoluteAudioUrl(rel: string): string {
+    return this.chatSvc.audioAbsoluteUrl(rel);
+  }
+
+  formatDuration(ms: number | null): string {
+    if (!ms || ms <= 0) return '0:00';
+    const total = Math.round(ms / 1000);
+    const mm = Math.floor(total / 60);
+    const ss = total % 60;
+    return `${mm}:${ss.toString().padStart(2, '0')}`;
+  }
+
+  async toggleGrabacion(): Promise<void> {
+    if (this.disabled || this.sending()) return;
+    if (this.recording()) {
+      // Detener y enviar.
+      this.recordingCanceled = false;
+      this.mediaRecorder?.stop();
+      return;
+    }
+    // Arrancar grabación.
+    try {
+      if (typeof navigator === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
+        this.error.set('Tu navegador no soporta grabación de audio.');
+        return;
+      }
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mimeType = this._pickSupportedMime();
+      const rec = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+      this.mediaStream = stream;
+      this.mediaRecorder = rec;
+      this.recordingChunks = [];
+      this.recordingCanceled = false;
+      this.error.set(null);
+
+      rec.ondataavailable = (ev) => {
+        if (ev.data && ev.data.size > 0) this.recordingChunks.push(ev.data);
+      };
+      rec.onstop = () => {
+        void this._finalizarGrabacion();
+      };
+
+      rec.start();
+      this.recording.set(true);
+      this.recordingStartedAt = Date.now();
+      this.recordingElapsedMs.set(0);
+      this.recordingTimer = window.setInterval(() => {
+        this.recordingElapsedMs.set(Date.now() - this.recordingStartedAt);
+        // Corte de seguridad a 2 min para respetar el límite del backend.
+        if (Date.now() - this.recordingStartedAt > 120_000) {
+          this.mediaRecorder?.stop();
+        }
+      }, 200);
+    } catch (err: any) {
+      this.error.set(
+        err?.name === 'NotAllowedError'
+          ? 'Necesitás permitir el uso del micrófono para grabar notas de voz.'
+          : 'No se pudo iniciar la grabación.'
+      );
+      this._cleanupRecording();
+    }
+  }
+
+  cancelarGrabacion(): void {
+    if (!this.recording()) return;
+    this.recordingCanceled = true;
+    try {
+      this.mediaRecorder?.stop();
+    } catch {}
+  }
+
+  private _pickSupportedMime(): string | null {
+    // Preferimos webm/opus (mejor ratio) → ogg/opus → mp4/aac (Safari).
+    const candidates = [
+      'audio/webm;codecs=opus',
+      'audio/webm',
+      'audio/ogg;codecs=opus',
+      'audio/mp4;codecs=mp4a.40.2',
+      'audio/mp4',
+    ];
+    for (const c of candidates) {
+      if (typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported(c)) return c;
+    }
+    return null;
+  }
+
+  private async _finalizarGrabacion(): Promise<void> {
+    const chunks = this.recordingChunks.slice();
+    const durationMs = Date.now() - this.recordingStartedAt;
+    const canceled = this.recordingCanceled;
+    this._cleanupRecording();
+    if (canceled) return;
+    if (chunks.length === 0) return;
+
+    const mime = chunks[0].type || 'audio/webm';
+    const blob = new Blob(chunks, { type: mime });
+    if (blob.size === 0) {
+      this.error.set('La grabación quedó vacía.');
+      return;
+    }
+
+    this.sending.set(true);
+    this.error.set(null);
+    try {
+      const res = await firstValueFrom(
+        this.chatSvc.enviarAudio(this.solicitudId, blob, durationMs)
+      );
+      this.messages.update((prev) => {
+        if (prev.some((m) => m.id === res.id)) return prev;
+        return [...prev, res];
+      });
+      this.scrollToBottom();
+    } catch (err: any) {
+      const detail = err?.error?.detail;
+      this.error.set(
+        typeof detail === 'string' && detail
+          ? detail
+          : 'No se pudo enviar la nota de voz.'
+      );
+    } finally {
+      this.sending.set(false);
+    }
+  }
+
+  private _cleanupRecording(): void {
+    if (this.recordingTimer !== null) {
+      window.clearInterval(this.recordingTimer);
+      this.recordingTimer = null;
+    }
+    try {
+      this.mediaStream?.getTracks().forEach((t) => t.stop());
+    } catch {}
+    this.mediaStream = null;
+    this.mediaRecorder = null;
+    this.recordingChunks = [];
+    this.recording.set(false);
+    this.recordingElapsedMs.set(0);
+    this.recordingStartedAt = 0;
   }
 
   async enviar(): Promise<void> {

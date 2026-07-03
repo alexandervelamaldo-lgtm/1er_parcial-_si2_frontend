@@ -6,6 +6,14 @@ import { AuthService } from '../autenticacion-acceso/auth.service';
 
 export type SolicitudChatRole = 'cliente' | 'tecnico' | 'taller';
 
+export interface SolicitudChatAudioInfo {
+  content_type: string;
+  duration_ms: number | null;
+  size_bytes: number;
+  /** URL relativa. El componente arma la absoluta con environment.apiUrl. */
+  url: string;
+}
+
 export interface SolicitudChatMessage {
   id: number;
   solicitud_id: number;
@@ -15,6 +23,7 @@ export interface SolicitudChatMessage {
   content: string;
   created_at: string;
   read_at: string | null;
+  audio: SolicitudChatAudioInfo | null;
 }
 
 export interface SolicitudChatHistoryResponse {
@@ -58,5 +67,52 @@ export class ChatSolicitudService {
       {},
       { headers: this.auth.getAuthHeaders() }
     );
+  }
+
+  /** Sube una nota de voz (multipart) y crea el mensaje asociado. */
+  enviarAudio(solicitudId: number, blob: Blob, durationMs: number | null) {
+    const form = new FormData();
+    const nombre = `voice-${Date.now()}.${_extensionFromMime(blob.type)}`;
+    form.append('archivo', blob, nombre);
+    if (durationMs && durationMs > 0) {
+      form.append('duration_ms', String(Math.round(durationMs)));
+    }
+    // No seteamos Content-Type manualmente — el browser agrega el boundary.
+    return this.http.post<SolicitudChatMessage>(
+      `${environment.apiUrl}/solicitudes/${solicitudId}/chat/audio`,
+      form,
+      { headers: this.auth.getAuthHeaders() }
+    );
+  }
+
+  /** Convierte una URL relativa del backend en absoluta apuntando a apiUrl. */
+  audioAbsoluteUrl(relative: string): string {
+    if (!relative) return '';
+    if (/^https?:\/\//i.test(relative)) return relative;
+    const base = environment.apiUrl.replace(/\/+$/, '');
+    const path = relative.startsWith('/') ? relative : `/${relative}`;
+    return `${base}${path}`;
+  }
+}
+
+
+/** Devuelve la extensión que corresponde al MIME grabado. */
+function _extensionFromMime(mime: string): string {
+  const base = (mime || '').split(';', 1)[0].trim().toLowerCase();
+  switch (base) {
+    case 'audio/webm':
+      return 'webm';
+    case 'audio/ogg':
+      return 'ogg';
+    case 'audio/mp4':
+      return 'm4a';
+    case 'audio/aac':
+      return 'aac';
+    case 'audio/mpeg':
+      return 'mp3';
+    case 'audio/wav':
+      return 'wav';
+    default:
+      return 'bin';
   }
 }

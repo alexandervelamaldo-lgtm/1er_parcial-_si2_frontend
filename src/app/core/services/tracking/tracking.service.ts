@@ -34,6 +34,12 @@ export type ChatMessageEvent = {
     sender_display_name: string;
     content: string;
     created_at: string | null;
+    audio?: {
+      content_type: string;
+      duration_ms: number | null;
+      size_bytes: number;
+      url: string;
+    } | null;
   };
 };
 
